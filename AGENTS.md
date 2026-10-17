@@ -133,10 +133,12 @@ if __name__ == "__main__":
 
 ```
 Rishi-OS/
-├── core/            # shared, agent-agnostic plumbing (router, caps, brands, validator, logger, db)
+├── core/            # shared, agent-agnostic plumbing (router, search, caps, brands, validator, logger, db)
 ├── agents/          # the 7 agents — each one thin, linear, 5-step
+├── prompts/         # one .md template per agent, loaded via config.load_prompt
 ├── dashboard/       # Streamlit control room — ZERO AI, read/write Supabase only
-├── .github/workflows/  # serverless cron: daily / weekly / 20-minute poller
+├── .github/workflows/  # serverless cron: daily / weekly (Sun 18:00) / 20-minute poller
+├── scripts/         # daily_reset.py, run_queued_tasks.py
 ├── schema.sql       # the 7 tables
 ├── AGENTS.md        # this file
 └── requirements.txt

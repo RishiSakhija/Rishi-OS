@@ -1,6 +1,8 @@
 name: daily
 
-# Daily agent cycle. Resets the run counters, then runs the once-a-day agents.
+# Morning pipeline. Per the blueprint the sequence is:
+#   daily_reset -> growth_coach -> research -> idea_strategist
+#               -> packaging_studio -> summarize_librarian -> ceo_supervisor
 # Every step is continue-on-error and every agent exits 0 by design
 # (AGENTS.md Rule 5) -- this workflow must never enter a retry loop.
 
@@ -17,7 +19,7 @@ concurrency:
 jobs:
   cycle:
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 20
 
     env:
       SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
@@ -44,22 +46,26 @@ jobs:
         continue-on-error: true
         run: python scripts/daily_reset.py
 
-      - name: 1. Research Agent
-        continue-on-error: true
-        run: python -m agents.research_agent
-
-      - name: 2. Growth Coach Agent
+      - name: Growth Coach Agent
         continue-on-error: true
         run: python -m agents.growth_coach_agent
 
-      - name: 4. Idea Strategist
+      - name: Research Agent
+        continue-on-error: true
+        run: python -m agents.research_agent
+
+      - name: Idea Strategist
         continue-on-error: true
         run: python -m agents.idea_strategist
 
-      - name: 5. Packaging Studio
+      - name: Packaging Studio
         continue-on-error: true
         run: python -m agents.packaging_studio
 
-      - name: 6. Analytics Auditor
+      - name: Summarize Librarian
         continue-on-error: true
-        run: python -m agents.analytics_auditor
+        run: python -m agents.summarize_librarian
+
+      - name: CEO Supervisor
+        continue-on-error: true
+        run: python -m agents.ceo_supervisor

@@ -32,6 +32,27 @@ FALLBACK_SOURCE = (
     "trusts."
 )
 
+# Fallback if prompts/summarize_librarian.md is missing.
+FALLBACK_TEMPLATE = """{{BRAND}}
+
+SOURCE TEXT:
+\"\"\"
+{{CONTEXT}}
+\"\"\"
+
+TASK -- library entry. Compress the source above using exactly these markdown
+headings:
+
+## Summary
+3-5 sentences capturing the argument, not the wording.
+
+## Key Points
+3-6 bullets, each one idea, each useful on its own.
+
+## Library Tags
+4-8 comma-separated lowercase tags for retrieval.
+"""
+
 
 def _strip_html(html: str) -> str:
     text = _TAGS.sub(" ", html or "")
@@ -91,27 +112,18 @@ def _source_text() -> tuple[str, str | None]:
     return FALLBACK_SOURCE, None
 
 
+def _template() -> str:
+    """Prompt from prompts/summarize_librarian.md, falling back to the inline copy."""
+    return config.load_prompt(NAME) or FALLBACK_TEMPLATE
+
+
 def build_prompt(brand: dict, source: str) -> str:
     """Assemble the prompt from an already-fetched source. Plain code."""
-    return f"""{brands.describe(brand)}
-
-SOURCE TEXT:
-\"\"\"
-{source}
-\"\"\"
-
-TASK -- library entry. Compress the source above using exactly these markdown
-headings:
-
-## Summary
-3-5 sentences capturing the argument, not the wording.
-
-## Key Points
-3-6 bullets, each one idea, each useful on its own.
-
-## Library Tags
-4-8 comma-separated lowercase tags for retrieval.
-"""
+    return config.render_prompt(
+        _template(),
+        brand=brands.describe(brand),
+        context=source,
+    )
 
 
 def main() -> int:

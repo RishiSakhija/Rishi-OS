@@ -1,11 +1,11 @@
 name: weekly
 
-# The CEO Supervisor looks at the whole system once a week.
+# Weekly audit. Per the blueprint, the Analytics Auditor runs Sunday evening.
 
 on:
   schedule:
-    # 06:00 UTC every Monday
-    - cron: "0 6 * * 1"
+    # 18:00 UTC every Sunday
+    - cron: "0 18 * * 0"
   workflow_dispatch:
 
 concurrency:
@@ -13,7 +13,7 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-  review:
+  audit:
     runs-on: ubuntu-latest
     timeout-minutes: 15
 
@@ -38,6 +38,6 @@ jobs:
       - name: Install dependencies
         run: pip install -r requirements.txt
 
-      - name: 7. CEO Supervisor
+      - name: Analytics Auditor
         continue-on-error: true
-        run: python -m agents.ceo_supervisor
+        run: python -m agents.analytics_auditor

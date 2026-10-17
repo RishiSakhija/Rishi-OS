@@ -6,11 +6,22 @@ logic, which is exactly the part of Rishi-OS that should be tested hard.
 
 from __future__ import annotations
 
+import re
 from pathlib import Path
 
 import pytest
 
-from core import caps, config, db, router, validator
+from core import caps, config, db, router, search, validator
+
+AGENT_NAMES = (
+    "research_agent",
+    "growth_coach_agent",
+    "summarize_librarian",
+    "idea_strategist",
+    "packaging_studio",
+    "analytics_auditor",
+    "ceo_supervisor",
+)
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 
@@ -243,3 +254,272 @@ def test_rulebook_exists_and_names_the_router():
     rulebook = (REPO_ROOT / "AGENTS.md").read_text(encoding="utf-8")
     assert "core/router.py" in rulebook
     assert "One Model Call Per Run" in rulebook
+
+
+# ---------------------------------------------------------------------------
+# config.load_prompt / render_prompt
+# ---------------------------------------------------------------------------
+@pytest.mark.parametrize("name", AGENT_NAMES)
+def test_prompt_file_exists_for_every_agent(name):
+    text = config.load_prompt(name)
+    assert text, f"prompts/{name}.md is missing or empty"
+    assert "{{BRAND}}" in text, f"prompts/{name}.md has no {{{{BRAND}}}} token"
+
+
+@pytest.mark.parametrize("name", AGENT_NAMES)
+def test_agent_fallback_template_matches_file_tokens(name):
+    """The inline fallback and the .md must expose the same tokens."""
+    import importlib
+
+    module = importlib.import_module(f"agents.{name}")
+    fallback = getattr(module, "FALLBACK_TEMPLATE", "")
+    assert fallback, f"{name} has no FALLBACK_TEMPLATE"
+
+    def tokens(text):
+        return set(re.findall(r"\{\{([A-Z_]+)\}\}", text))
+
+    # Every token the inline fallback renders must also exist in the .md,
+    # otherwise the file-based prompt would ship a literal {{TOKEN}} to the model.
+    assert tokens(fallback) <= tokens(config.load_prompt(name))
+    assert "BRAND" in tokens(fallback)
+
+
+def test_load_prompt_missing_returns_empty():
+    assert config.load_prompt("no_such_agent") == ""
+    assert config.load_prompt("") == ""
+
+
+def test_render_prompt_substitutes_tokens():
+    assert config.render_prompt("A {{BRAND}} B {{CONTEXT}}", brand="X", context="Y") == "A X B Y"
+
+
+def test_render_prompt_leaves_unknown_tokens_untouched():
+    assert config.render_prompt("{{NOPE}}", brand="X") == "{{NOPE}}"
+
+
+# ---------------------------------------------------------------------------
+# core/search.py
+# ---------------------------------------------------------------------------
+def _stub_db(monkeypatch, seen=()):
+    """Silence datahouse access inside search and capture the usage row."""
+    captured: dict = {}
+    monkeypatch.setattr(search.db, "is_duplicate", lambda **kw: kw.get("url") in seen)
+    monkeypatch.setattr(search.db, "record_usage", lambda **kw: captured.update(kw))
+    return captured
+
+
+def test_web_search_returns_empty_for_blank_query():
+    assert search.web_search("") == []
+    assert search.web_search("   ") == []
+
+
+def test_web_search_prefers_tavily_when_key_present(monkeypatch):
+    monkeypatch.setattr(config, "TAVILY_API_KEY", "test-key")
+    monkeypatch.setattr(
+        search, "_tavily",
+        lambda q, n: [{"title": "T", "url": "https://a.test", "snippet": "s", "source": "tavily"}],
+    )
+    captured = _stub_db(monkeypatch)
+
+    out = search.web_search("query", 5, agent="research_agent")
+
+    assert [r["url"] for r in out] == ["https://a.test"]
+    assert captured["provider"] == "tavily"
+    assert captured["agent"] == "research_agent"
+
+
+def test_web_search_falls_back_to_free_sources_without_key(monkeypatch):
+    monkeypatch.setattr(config, "TAVILY_API_KEY", "")
+    monkeypatch.setattr(
+        search, "_free_search",
+        lambda q, n: [{"title": "F", "url": "https://b.test", "snippet": "s", "source": "hackernews"}],
+    )
+    captured = _stub_db(monkeypatch)
+
+    out = search.web_search("query")
+
+    assert [r["url"] for r in out] == ["https://b.test"]
+    assert captured["provider"] == "free_search"
+
+
+def test_web_search_falls_back_when_tavily_raises(monkeypatch):
+    monkeypatch.setattr(config, "TAVILY_API_KEY", "test-key")
+
+    def boom(_query, _max):
+        raise RuntimeError("tavily down")
+
+    monkeypatch.setattr(search, "_tavily", boom)
+    monkeypatch.setattr(
+        search, "_free_search",
+        lambda q, n: [{"title": "F", "url": "https://c.test", "snippet": "", "source": "reddit"}],
+    )
+    captured = _stub_db(monkeypatch)
+
+    out = search.web_search("query")
+
+    assert [r["source"] for r in out] == ["reddit"]
+    assert captured["provider"] == "free_search"
+
+
+def test_web_search_dedupes_seen_and_repeated_urls(monkeypatch):
+    monkeypatch.setattr(config, "TAVILY_API_KEY", "")
+    monkeypatch.setattr(
+        search, "_free_search",
+        lambda q, n: [
+            {"title": "A", "url": "https://seen.test", "snippet": "", "source": "hackernews"},
+            {"title": "B", "url": "https://new.test", "snippet": "", "source": "reddit"},
+            {"title": "C", "url": "https://new.test", "snippet": "", "source": "google_news"},
+        ],
+    )
+    _stub_db(monkeypatch, seen={"https://seen.test"})
+
+    out = search.web_search("query")
+
+    assert [r["url"] for r in out] == ["https://new.test"]
+
+
+def test_web_search_respects_max_results(monkeypatch):
+    monkeypatch.setattr(config, "TAVILY_API_KEY", "")
+    monkeypatch.setattr(
+        search, "_free_search",
+        lambda q, n: [
+            {"title": str(i), "url": f"https://x{i}.test", "snippet": "", "source": "reddit"}
+            for i in range(10)
+        ],
+    )
+    _stub_db(monkeypatch)
+
+    assert len(search.web_search("query", max_results=3)) == 3
+
+
+def test_web_search_survives_unreachable_datahouse(monkeypatch):
+    """A dead datahouse must not lose search results entirely."""
+    monkeypatch.setattr(config, "TAVILY_API_KEY", "")
+
+    def boom(**kw):
+        raise RuntimeError("db down")
+
+    monkeypatch.setattr(
+        search, "_free_search",
+        lambda q, n: [{"title": "A", "url": "https://a.test", "snippet": "", "source": "reddit"}],
+    )
+    monkeypatch.setattr(search.db, "is_duplicate", boom)
+    monkeypatch.setattr(search.db, "record_usage", boom)
+
+    assert [r["url"] for r in search.web_search("q")] == ["https://a.test"]
+
+
+def test_free_search_survives_every_source_failing(monkeypatch):
+    def boom(_query, _max):
+        raise RuntimeError("down")
+
+    monkeypatch.setattr(search, "_hackernews", boom)
+    monkeypatch.setattr(search, "_google_news", boom)
+    monkeypatch.setattr(search, "_reddit", boom)
+
+    assert search._free_search("query", 5) == []
+
+
+def test_free_search_interleaves_sources(monkeypatch):
+    monkeypatch.setattr(
+        search, "_hackernews",
+        lambda q, n: [{"title": "h1", "url": "https://h1", "snippet": "", "source": "hackernews"}],
+    )
+    monkeypatch.setattr(search, "_google_news", lambda q, n: [])
+    monkeypatch.setattr(
+        search, "_reddit",
+        lambda q, n: [{"title": "r1", "url": "https://r1", "snippet": "", "source": "reddit"}],
+    )
+
+    assert [r["url"] for r in search._free_search("q", 5)] == ["https://h1", "https://r1"]
+
+
+def test_as_prompt_block_handles_empty_and_populated():
+    assert "no fresh web results" in search.as_prompt_block([])
+
+    block = search.as_prompt_block(
+        [{"title": "T", "url": "https://a.test", "snippet": "S", "source": "tavily"}]
+    )
+    assert "T" in block and "https://a.test" in block and "S" in block
+
+
+def test_as_prompt_block_respects_input_ceiling():
+    big = [
+        {"title": "T" * 500, "url": "https://a.test", "snippet": "S" * 900, "source": "tavily"}
+        for _ in range(50)
+    ]
+    block = search.as_prompt_block(big)
+    assert len(block) <= config.MAX_INPUT_CHARS
+
+
+# ---------------------------------------------------------------------------
+# Blueprint compliance regressions
+# ---------------------------------------------------------------------------
+def _seed_line(agent: str) -> str:
+    sql = (REPO_ROOT / "schema.sql").read_text(encoding="utf-8")
+    matches = [ln for ln in sql.splitlines() if ln.strip().startswith(f"('{agent}'")]
+    assert matches, f"no seed row for {agent}"
+    return " ".join(matches)
+
+
+def test_analytics_auditor_seed_is_weekly():
+    assert "'weekly'" in _seed_line("analytics_auditor")
+
+
+def test_ceo_supervisor_seed_is_daily():
+    assert "'daily'" in _seed_line("ceo_supervisor")
+
+
+def test_weekly_workflow_is_sunday_evening():
+    text = (REPO_ROOT / ".github/workflows/weekly.yml").read_text(encoding="utf-8")
+    assert "0 18 * * 0" in text
+    assert "analytics_auditor" in text
+    assert "ceo_supervisor" not in text
+
+
+def test_daily_workflow_runs_blueprint_order():
+    text = (REPO_ROOT / ".github/workflows/daily.yml").read_text(encoding="utf-8")
+    # Parse actual `run: python ...` steps, not prose in the header comment.
+    runs = re.findall(r"run: python (.+)", text)
+
+    assert runs == [
+        "scripts/daily_reset.py",
+        "-m agents.growth_coach_agent",
+        "-m agents.research_agent",
+        "-m agents.idea_strategist",
+        "-m agents.packaging_studio",
+        "-m agents.summarize_librarian",
+        "-m agents.ceo_supervisor",
+    ]
+    assert "analytics_auditor" not in text
+
+
+def test_poller_drains_queue_then_runs_librarian():
+    text = (REPO_ROOT / ".github/workflows/poller.yml").read_text(encoding="utf-8")
+    runs = re.findall(r"run: python (.+)", text)
+    assert runs == [
+        "scripts/run_queued_tasks.py",
+        "-m agents.summarize_librarian",
+    ]
+
+
+def test_readme_mermaid_block_one_is_complete():
+    readme = (REPO_ROOT / "README.md").read_text(encoding="utf-8")
+    blocks = re.findall(r"```mermaid\n(.*?)```", readme, re.DOTALL)
+    assert len(blocks) == 3
+
+    first = blocks[0]
+    for edge in ("CRON --> Core", "Core --> Roster", "Roster <--> DB", "DB <--> ST", "ST -->|"):
+        assert edge in first, f"mermaid block 1 missing edge: {edge}"
+
+
+def test_logger_has_no_dead_schema_ready_constant():
+    source = (REPO_ROOT / "core" / "logger.py").read_text(encoding="utf-8")
+    assert "_SCHEMA_READY" not in source
+
+
+def test_queue_drain_covers_every_agent():
+    import importlib
+
+    module = importlib.import_module("scripts.run_queued_tasks")
+    assert set(module.AGENT_MODULES) == set(AGENT_NAMES)

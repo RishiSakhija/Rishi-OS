@@ -1,12 +1,14 @@
 """1. Research Agent -- find fresh, deduped signal on a topic.
 
 Step 2 is pure plain code: pull queued topics from `tasks`, drop anything
-already seen (URL match + content hash), and only then build the prompt.
+already seen, fetch real web results via `core.search`, and only then build the
+prompt. The web fetch happens *inside* `build_prompt`, which `_pattern.execute`
+calls only after the cap check passes, so a cap-reached run costs zero HTTP.
 """
 
 from __future__ import annotations
 
-from core import brands, db, logger
+from core import brands, config, db, logger, search
 
 from . import _pattern
 
@@ -21,6 +23,32 @@ DEFAULT_TOPICS = (
     "AI agents that replace paid SaaS tooling",
     "founder-led distribution channels that still work in 2026",
 )
+
+DEFAULT_QUERY = "zero-budget startup growth tactics"
+
+# Fallback if prompts/research_agent.md is missing.
+FALLBACK_TEMPLATE = """{{BRAND}}
+
+QUEUED TOPICS:
+{{TOPICS}}
+
+FRESH WEB RESULTS (fetched moments ago, use these as your main evidence):
+{{CONTEXT}}
+
+TASK -- research briefing.
+
+Pick the single most promising topic and produce a research briefing using
+exactly these markdown headings:
+
+## Signal
+What is actually happening, in 3-5 sentences. Concrete and specific.
+
+## Why It Matters
+Why this matters to this brand's audience. 2-4 sentences.
+
+## Next Step
+One concrete action to take this week.
+"""
 
 
 def _load_topics(limit: int = 5) -> list[str]:
@@ -41,7 +69,7 @@ def _load_topics(limit: int = 5) -> list[str]:
         for row in rows:
             payload = row.get("payload") or {}
             topic = (payload.get("topic") or "").strip()
-            if topic and topic not in topics and not db.seen_url(topic):
+            if topic and topic not in topics:
                 topics.append(topic)
     except Exception as exc:  # noqa: BLE001 - degrade to the default topic list
         logger.log_run(NAME, "skipped", notes=f"tasks_unavailable: {exc}")
@@ -49,27 +77,22 @@ def _load_topics(limit: int = 5) -> list[str]:
     return topics[:limit] or list(DEFAULT_TOPICS)
 
 
+def _template() -> str:
+    """Prompt from prompts/research_agent.md, falling back to the inline copy."""
+    return config.load_prompt(NAME) or FALLBACK_TEMPLATE
+
+
 def build_prompt(brand: dict) -> str:
-    bullets = "\n".join(f"- {topic}" for topic in _load_topics())
-    return f"""{brands.describe(brand)}
-
-TASK -- research briefing.
-
-Consider these queued topics:
-{bullets}
-
-Pick the single most promising topic and produce a research briefing using
-exactly these markdown headings:
-
-## Signal
-What is actually happening, in 3-5 sentences. Concrete and specific.
-
-## Why It Matters
-Why this matters to this brand's audience. 2-4 sentences.
-
-## Next Step
-One concrete action to take this week.
-"""
+    topics = _load_topics()
+    results = search.web_search(
+        topics[0] if topics else DEFAULT_QUERY, max_results=5, agent=NAME
+    )
+    return config.render_prompt(
+        _template(),
+        brand=brands.describe(brand),
+        topics="\n".join(f"- {topic}" for topic in topics),
+        context=search.as_prompt_block(results),
+    )
 
 
 def main() -> int:

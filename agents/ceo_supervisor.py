@@ -1,14 +1,15 @@
-"""7. CEO Supervisor -- weekly cross-agent review and prioritisation.
+"""7. CEO Supervisor -- cross-agent review and prioritisation.
 
 The only agent that looks at the whole system. It reads run telemetry and
-recent outputs, then decides what the other six should do next.
+recent outputs, then decides what the other six should do next. Runs at the end
+of the daily morning pipeline per the blueprint (see `.github/workflows/daily.yml`).
 """
 
 from __future__ import annotations
 
 from collections import Counter
 
-from core import brands, db, logger
+from core import brands, config, db, logger
 
 from . import _pattern
 
@@ -20,6 +21,27 @@ REQUIRED = ("Week In Review", "Priorities", "Risks")
 LOG_WINDOW = 60
 OUTPUT_WINDOW = 12
 CHARS_PER_OUTPUT = 700
+
+# Fallback if prompts/ceo_supervisor.md is missing.
+FALLBACK_TEMPLATE = """{{BRAND}}
+
+SYSTEM STATE (measured, trust these counts):
+{{CONTEXT}}
+
+TASK -- executive review of the whole system, run at the end of the daily
+pipeline. You are accountable for the entire system, not for one agent's
+output. Use exactly these markdown headings:
+
+## Week In Review
+What the system actually did since the last review, and whether the cadence is
+right. 3-5 sentences.
+
+## Priorities
+The next 3 decisions, ranked, each one line with the reason.
+
+## Risks
+Where this system is failing, drifting, or wasting money. 2-4 bullets, honest.
+"""
 
 
 def _system_state() -> str:
@@ -78,27 +100,20 @@ def _system_state() -> str:
     return "\n".join(blocks)
 
 
+def _template() -> str:
+    """Prompt from prompts/ceo_supervisor.md, falling back to the inline copy."""
+    return config.load_prompt(NAME) or FALLBACK_TEMPLATE
+
+
 def build_prompt(brand: dict) -> str:
     state = _system_state()
     if not state:
         return ""
-    return f"""{brands.describe(brand)}
-
-SYSTEM STATE (measured, trust these counts):
-{state}
-
-TASK -- weekly executive review. You are accountable for the whole system, not
-TASK output. Use exactly these markdown headings:
-
-## Week In Review
-What the system actually did, and whether the cadence is right. 3-5 sentences.
-
-## Priorities
-The next 3 decisions, ranked, each one line with the reason.
-
-## Risks
-Where this system is failing, drifting, or wasting money. 2-4 bullets, honest.
-"""
+    return config.render_prompt(
+        _template(),
+        brand=brands.describe(brand),
+        context=state,
+    )
 
 
 def main() -> int:

@@ -132,6 +132,35 @@ def list_brands() -> list[dict]:
     return client().table("brands").select("*").order("key").execute().data
 
 
+def queued_tasks(limit: int = 20) -> list[dict]:
+    """Oldest queued tasks first, so the queue drains in order."""
+    return (
+        client()
+        .table("tasks")
+        .select("*")
+        .eq("status", "queued")
+        .order("created_at")
+        .limit(limit)
+        .execute()
+        .data
+    )
+
+
+def latest_log(agent: str) -> dict | None:
+    """Most recent telemetry row for an agent, used to judge a task's outcome."""
+    rows = (
+        client()
+        .table("logs")
+        .select("status,notes,time")
+        .eq("agent", agent)
+        .order("time", desc=True)
+        .limit(1)
+        .execute()
+        .data
+    )
+    return rows[0] if rows else None
+
+
 # --------------------------------------------------------------------------
 # Writes
 # --------------------------------------------------------------------------
@@ -201,6 +230,11 @@ def save_task(*, agent: str, payload: dict, status: str = "queued") -> dict | No
         .execute()
     )
     return result.data[0] if result.data else None
+
+
+def mark_task(task_id: str, status: str) -> None:
+    """Move a task to `done` or `failed` after an agent run."""
+    client().table("tasks").update({"status": status}).eq("id", task_id).execute()
 
 
 def save_note(*, body: str, brand: str | None = None, kind: str = "note") -> dict | None:

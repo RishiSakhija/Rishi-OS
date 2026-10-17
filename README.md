@@ -68,6 +68,7 @@ flowchart TB
     Core --> Roster
     Roster <--> DB
     DB <--> ST
+    ST -->|"queue task / approve / reject / toggle caps"| DB
 ```
 
 </div>
@@ -169,11 +170,13 @@ Rishi-OS/
 ├── agents/                 # the 7 agents — thin, linear, 5-step
 ├── core/                   # shared plumbing (the only place with model access)
 │   ├── router.py           #   multi-LLM fallback chain
+│   ├── search.py           #   web search: Tavily, else keyless HN/Reddit/News
 │   ├── caps.py             #   enabled + daily_cap enforcement
 │   ├── brands.py           #   brand profile loader
 │   ├── validator.py        #   section/template validation
 │   ├── logger.py           #   append-only telemetry
 │   └── db.py               #   Supabase read/write, dedupe by SHA-256 + URL
+├── prompts/                # one .md template per agent, loaded by config.load_prompt
 ├── dashboard/              # Streamlit control room — ZERO AI
 ├── schema.sql              # the 7 tables
 ├── .env.example            # every key the system needs, no real values

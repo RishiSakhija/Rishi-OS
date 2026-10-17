@@ -1,9 +1,10 @@
 name: poller
 
-# Runs the librarian every 20 minutes to drain the queue the dashboard fills.
-# GitHub's scheduled events are best-effort and can be delayed under load;
-# the agent's own caps and de-duplication make a skipped or doubled tick
-# harmless.
+# Every 20 minutes: drain the task queue the dashboard fills, then always run
+# the librarian so newly queued sources get summarised.
+#
+# GitHub's scheduled events are best-effort and can be delayed under load; the
+# agents' own caps and de-duplication make a skipped or doubled tick harmless.
 
 on:
   schedule:
@@ -17,7 +18,7 @@ concurrency:
 jobs:
   drain:
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 15
 
     env:
       SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
@@ -40,6 +41,10 @@ jobs:
       - name: Install dependencies
         run: pip install -r requirements.txt
 
-      - name: 3. Summarize Librarian
+      - name: Drain queued tasks
+        continue-on-error: true
+        run: python scripts/run_queued_tasks.py
+
+      - name: Summarize Librarian
         continue-on-error: true
         run: python -m agents.summarize_librarian

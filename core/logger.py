@@ -12,8 +12,6 @@ import time
 
 from . import config, db
 
-_SCHEMA_READY = True
-
 
 def _truncate(value: str | None) -> str:
     value = "" if value is None else str(value)

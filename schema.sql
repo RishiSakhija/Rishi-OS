@@ -144,8 +144,8 @@ insert into agents (name, purpose, enabled, daily_cap, schedule) values
     ('summarize_librarian','Compress long-form input into a library entry',false, 6, 'every-20-min'),
     ('idea_strategist',    'Turn signal into ranked content angles',       false, 1, 'daily'),
     ('packaging_studio',   'Draft platform-ready posts from one angle',    false, 1, 'daily'),
-    ('analytics_auditor',  'Read metrics, report what worked',             false, 1, 'daily'),
-    ('ceo_supervisor',     'Weekly cross-agent review and prioritisation', false, 1, 'weekly')
+    ('analytics_auditor',  'Read metrics, report what worked',             false, 1, 'weekly'),
+    ('ceo_supervisor',     'Daily cross-agent review and prioritisation',  false, 1, 'daily')
 on conflict (name) do nothing;
 
 -- ---------------------------------------------------------------------------

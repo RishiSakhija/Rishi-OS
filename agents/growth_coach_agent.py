@@ -6,7 +6,7 @@ thinking about what to focus on next.
 
 from __future__ import annotations
 
-from core import brands, db, logger
+from core import brands, config, db, logger
 
 from . import _pattern
 
@@ -16,6 +16,27 @@ STATUS = "needs_review"
 REQUIRED = ("Focus", "Today's Action", "Watch Out For")
 
 MAX_NOTES = 5
+
+# Fallback if prompts/growth_coach_agent.md is missing.
+FALLBACK_TEMPLATE = """{{BRAND}}
+
+CONTEXT -- recent journal entries, newest first:
+{{CONTEXT}}
+
+TASK -- daily growth coaching.
+
+Identify the single highest-leverage thing to work on next. Use exactly these
+markdown headings:
+
+## Focus
+The one thing that matters most right now, and why. 2-4 sentences.
+
+## Today's Action
+A concrete action completable today. One paragraph, no hedging.
+
+## Watch Out For
+The most likely way this goes wrong, and the guardrail. 1-3 sentences.
+"""
 
 
 def _recent_notes(limit: int = MAX_NOTES) -> list[str]:
@@ -42,28 +63,19 @@ def _recent_notes(limit: int = MAX_NOTES) -> list[str]:
     return notes
 
 
+def _template() -> str:
+    """Prompt from prompts/growth_coach_agent.md, falling back to the inline copy."""
+    return config.load_prompt(NAME) or FALLBACK_TEMPLATE
+
+
 def build_prompt(brand: dict) -> str:
     notes = _recent_notes()
     context = "\n".join(notes) if notes else "- (no recent journal entries)"
-    return f"""{brands.describe(brand)}
-
-CONTEXT -- recent journal entries, newest first:
-{context}
-
-TASK -- daily growth coaching.
-
-Identify the single highest-leverage thing to work on next. Use exactly these
-markdown headings:
-
-## Focus
-The one thing that matters most right now, and why. 2-4 sentences.
-
-## Today's Action
-A concrete action completable today. One paragraph, no hedging.
-
-## Watch Out For
-The most likely way this goes wrong, and the guardrail. 1-3 sentences.
-"""
+    return config.render_prompt(
+        _template(),
+        brand=brands.describe(brand),
+        context=context,
+    )
 
 
 def main() -> int:

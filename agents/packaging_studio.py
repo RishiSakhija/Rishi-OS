@@ -6,7 +6,7 @@ Output is always `needs_review`: a human decides what ships (AGENTS.md Rule 6).
 
 from __future__ import annotations
 
-from core import brands, db, logger
+from core import brands, config, db, logger
 
 from . import _pattern
 
@@ -17,6 +17,25 @@ REQUIRED = ("LinkedIn", "X Post", "Newsletter Hook")
 
 UPSTREAM = "idea_strategist"
 ANGLE_CHARS = 1800
+
+# Fallback if prompts/packaging_studio.md is missing.
+FALLBACK_TEMPLATE = """{{BRAND}}
+
+ANGLE TO PACKAGE:
+{{CONTEXT}}
+
+TASK -- draft platform-ready posts for this one angle. Use exactly these
+markdown headings:
+
+## LinkedIn
+One post, 120-200 words. Opens with a specific claim, no throat-clearing.
+
+## X Post
+One post, under 260 characters. No hashtags.
+
+## Newsletter Hook
+3-5 sentences that would make someone open the email. Ends with the payoff.
+"""
 
 
 def _top_angle() -> str:
@@ -41,27 +60,20 @@ def _top_angle() -> str:
     return (rows[0].get("clean") or "").strip()[:ANGLE_CHARS]
 
 
+def _template() -> str:
+    """Prompt from prompts/packaging_studio.md, falling back to the inline copy."""
+    return config.load_prompt(NAME) or FALLBACK_TEMPLATE
+
+
 def build_prompt(brand: dict) -> str:
     angle = _top_angle()
     if not angle:
         return ""
-    return f"""{brands.describe(brand)}
-
-ANGLE TO PACKAGE:
-{angle}
-
-TASK -- draft platform-ready posts for this one angle. Use exactly these
-markdown headings:
-
-## LinkedIn
-One post, 120-200 words. Opens with a specific claim, no throat-clearing.
-
-## X Post
-One post, under 260 characters. No hashtags.
-
-## Newsletter Hook
-3-5 sentences that would make someone open the email. Ends with the payoff.
-"""
+    return config.render_prompt(
+        _template(),
+        brand=brands.describe(brand),
+        context=angle,
+    )
 
 
 def main() -> int:

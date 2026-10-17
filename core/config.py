@@ -135,3 +135,36 @@ def trim(text: str, limit: int = MAX_INPUT_CHARS) -> tuple[str, bool]:
     if len(text) <= limit:
         return text, False
     return text[:limit], True
+
+
+# --------------------------------------------------------------------------
+# Prompt templates (externalised in /prompts)
+#
+# Templates use `{{TOKEN}}` placeholders rather than str.format, because prompt
+# bodies routinely contain literal braces (JSON examples, f-string snippets)
+# that would break .format().
+# --------------------------------------------------------------------------
+PROMPTS_DIR = ROOT / "prompts"
+
+
+def load_prompt(agent_name: str) -> str:
+    """Return the contents of `prompts/<agent_name>.md`.
+
+    Returns an empty string when the file is missing or unreadable, so callers
+    can fall back to their inline template instead of crashing a scheduled run.
+    """
+    if not agent_name:
+        return ""
+    path = PROMPTS_DIR / f"{agent_name}.md"
+    try:
+        return path.read_text(encoding="utf-8").strip()
+    except (OSError, UnicodeDecodeError):
+        return ""
+
+
+def render_prompt(template: str, **tokens: str) -> str:
+    """Substitute `{{TOKEN}}` placeholders. Unknown tokens are left untouched."""
+    rendered = template
+    for name, value in tokens.items():
+        rendered = rendered.replace("{{" + name.upper() + "}}", str(value))
+    return rendered

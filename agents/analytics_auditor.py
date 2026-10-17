@@ -2,13 +2,15 @@
 
 Every number here is counted in plain Python. The model is asked only to
 interpret, never to compute (AGENTS.md Rule 1).
+
+Runs weekly (Sunday evening) per the blueprint -- see `.github/workflows/weekly.yml`.
 """
 
 from __future__ import annotations
 
 from collections import Counter
 
-from core import brands, db, logger
+from core import brands, config, db, logger
 
 from . import _pattern
 
@@ -18,6 +20,25 @@ STATUS = "draft"
 REQUIRED = ("What Shipped", "What Worked", "Do Next")
 
 WINDOW = 50
+
+# Fallback if prompts/analytics_auditor.md is missing.
+FALLBACK_TEMPLATE = """{{BRAND}}
+
+MEASURED METRICS (counted in plain Python, trust these):
+{{CONTEXT}}
+
+TASK -- performance review. Interpret the metrics above. Do not invent numbers
+that are not listed. Use exactly these markdown headings:
+
+## What Shipped
+What actually got produced. 2-3 sentences.
+
+## What Worked
+What the numbers suggest is working, and what looks like noise. 3-5 sentences.
+
+## Do Next
+Two or three concrete changes for the next cycle, ranked.
+"""
 
 
 def _metrics() -> str:
@@ -66,27 +87,20 @@ def _metrics() -> str:
     return "\n".join(lines)
 
 
+def _template() -> str:
+    """Prompt from prompts/analytics_auditor.md, falling back to the inline copy."""
+    return config.load_prompt(NAME) or FALLBACK_TEMPLATE
+
+
 def build_prompt(brand: dict) -> str:
     metrics = _metrics()
     if not metrics:
         return ""
-    return f"""{brands.describe(brand)}
-
-MEASURED METRICS (counted in plain Python, trust these):
-{metrics}
-
-TASK -- performance review. Interpret the metrics above. Do not invent numbers
-that are not listed. Use exactly these markdown headings:
-
-## What Shipped
-What actually got produced. 2-3 sentences.
-
-## What Worked
-What the numbers suggest is working, and what looks like noise. 3-5 sentences.
-
-## Do Next
-Two or three concrete changes for the next cycle, ranked.
-"""
+    return config.render_prompt(
+        _template(),
+        brand=brands.describe(brand),
+        context=metrics,
+    )
 
 
 def main() -> int:
