@@ -1,0 +1,21 @@
+# Rishi-OS — Python 3.11+
+# Zero-budget stack: direct SDK/REST calls only. No LangChain, no CrewAI.
+
+# ---- Datahouse ----
+supabase
+pydantic
+python-dotenv
+
+# ---- HTTP / Model Router ----
+requests
+
+# ---- Control Room ----
+streamlit
+pandas
+
+# ---- Ingestion (plain-code fetch before any AI call) ----
+feedparser
+youtube-transcript-api
+
+# ---- Tests ----
+pytest
