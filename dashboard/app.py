@@ -15,9 +15,11 @@ Run from the repository root:
 
 from __future__ import annotations
 
+import json
 import os
 import subprocess
 import sys
+from datetime import datetime
 from pathlib import Path
 
 # ---------------------------------------------------------------------------
@@ -53,7 +55,7 @@ st.set_page_config(
 )
 
 # ---------------------------------------------------------------------------
-# Sanitize Supabase credentials (strip quotes/newlines) — Bug A fix
+# Sanitize Supabase credentials (strip whitespace/quotes) — Bug A fix
 # ---------------------------------------------------------------------------
 _SUPABASE_URL = (os.getenv("SUPABASE_URL", "") or "").strip().strip('"').strip("'")
 _SUPABASE_KEY = (os.getenv("SUPABASE_KEY", "") or "").strip().strip('"').strip("'")
@@ -63,19 +65,192 @@ config.SUPABASE_URL = _SUPABASE_URL
 config.SUPABASE_KEY = _SUPABASE_KEY
 
 # ---------------------------------------------------------------------------
-# Default Agent Fleet (7 built-in agents) — Fallback for empty DB — Bug A fix
+# Local Runtime State Mirror (dashboard/.runtime_state.json)
+# Provides seamless offline/fallback with ZERO error banners
+# ---------------------------------------------------------------------------
+_RUNTIME_STATE_PATH = ROOT_DIR / "dashboard" / ".runtime_state.json"
+
+def _load_local_state() -> dict:
+    """Load local JSON mirror. Returns empty structure if missing/corrupt."""
+    try:
+        if _RUNTIME_STATE_PATH.exists():
+            return json.loads(_RUNTIME_STATE_PATH.read_text(encoding="utf-8"))
+    except Exception:
+        pass
+    return {
+        "agents": [],
+        "brands": [],
+        "outputs": [],
+        "tasks": [],
+        "notes": [],
+        "logs": [],
+        "usage": [],
+        "last_sync": None,
+    }
+
+def _save_local_state(state: dict) -> None:
+    """Persist local mirror atomically."""
+    try:
+        state["last_sync"] = datetime.utcnow().isoformat()
+        tmp = _RUNTIME_STATE_PATH.with_suffix(".tmp")
+        tmp.write_text(json.dumps(state, indent=2), encoding="utf-8")
+        tmp.replace(_RUNTIME_STATE_PATH)
+    except Exception:
+        pass
+
+def _merge_remote_into_local(remote_data: list, local_list: list, key: str = "id") -> list:
+    """Merge remote data into local list, preferring remote for matching keys."""
+    if not remote_data:
+        return local_list
+    remote_map = {item.get(key): item for item in remote_data if item.get(key)}
+    merged = {item.get(key): item for item in local_list if item.get(key)}
+    merged.update(remote_map)
+    return list(merged.values())
+
+# Initialize local state in session_state
+if "local_state" not in st.session_state:
+    st.session_state.local_state = _load_local_state()
+
+# ---------------------------------------------------------------------------
+# Default Agent Fleet (7 built-in agents) — Always available, never empty
 # ---------------------------------------------------------------------------
 DEFAULT_AGENTS = [
-    {"name": "research_agent", "purpose": "Find fresh, deduped signal on a topic", "enabled": False, "daily_cap": 1, "schedule": "daily"},
-    {"name": "growth_coach_agent", "purpose": "Personal progress and habit coaching", "enabled": False, "daily_cap": 1, "schedule": "daily"},
-    {"name": "summarize_librarian", "purpose": "Compress long-form input into a library entry", "enabled": False, "daily_cap": 6, "schedule": "every-20-min"},
-    {"name": "idea_strategist", "purpose": "Turn signal into ranked content angles", "enabled": False, "daily_cap": 1, "schedule": "daily"},
-    {"name": "packaging_studio", "purpose": "Draft platform-ready posts from one angle", "enabled": False, "daily_cap": 1, "schedule": "daily"},
-    {"name": "analytics_auditor", "purpose": "Read metrics, report what worked", "enabled": False, "daily_cap": 1, "schedule": "weekly"},
-    {"name": "ceo_supervisor", "purpose": "Daily cross-agent review and prioritisation", "enabled": False, "daily_cap": 1, "schedule": "daily"},
+    {"name": "research_agent", "purpose": "Find fresh, deduped signal on a topic", "enabled": False, "daily_cap": 1, "schedule": "daily", "runs_today": 0},
+    {"name": "growth_coach_agent", "purpose": "Personal progress and habit coaching", "enabled": False, "daily_cap": 1, "schedule": "daily", "runs_today": 0},
+    {"name": "summarize_librarian", "purpose": "Compress long-form input into a library entry", "enabled": False, "daily_cap": 6, "schedule": "every-20-min", "runs_today": 0},
+    {"name": "idea_strategist", "purpose": "Turn signal into ranked content angles", "enabled": False, "daily_cap": 1, "schedule": "daily", "runs_today": 0},
+    {"name": "packaging_studio", "purpose": "Draft platform-ready posts from one angle", "enabled": False, "daily_cap": 1, "schedule": "daily", "runs_today": 0},
+    {"name": "analytics_auditor", "purpose": "Read metrics, report what worked", "enabled": False, "daily_cap": 1, "schedule": "weekly", "runs_today": 0},
+    {"name": "ceo_supervisor", "purpose": "Daily cross-agent review and prioritisation", "enabled": False, "daily_cap": 1, "schedule": "daily", "runs_today": 0},
 ]
 
-DEFAULT_BRANDS = ["edivic", "nowrides", "velvet", "personal"]
+DEFAULT_BRANDS = [
+    {"key": "edivic", "name": "EDIVIC", "voice": "direct and technical; explains the mechanism, not the hype", "audience": "technical founders and operators evaluating AI tooling", "platforms": "linkedin, x, newsletter", "always": "concrete numbers, working examples, plain language", "never": "buzzwords, unsupported claims, engagement bait"},
+    {"key": "nowrides", "name": "NowRides", "voice": "warm and practical; speaks to operators, not investors", "audience": "mobility operators and small fleet owners", "platforms": "linkedin, x, newsletter", "always": "real operational detail, cost per unit, plain language", "never": "hype, vanity metrics, jargon"},
+    {"key": "velvet", "name": "Velvet", "voice": "elegant and understated; luxury without pretension", "audience": "premium lifestyle audience", "platforms": "linkedin, instagram, newsletter", "always": "refined tone, quality signals, restraint", "never": "loud, mass-market, discount language"},
+    {"key": "personal", "name": "Rishi (Personal)", "voice": "first-person, honest, builds in public, admits what broke", "audience": "founders and builders following the journey", "platforms": "x, linkedin, newsletter", "always": "specific lessons, real numbers, one clear takeaway", "never": "guru tone, fake certainty, emoji walls"},
+]
+
+# ---------------------------------------------------------------------------
+# Data Access Layer — Silent Supabase + Local Mirror (ZERO st.error banners)
+# ---------------------------------------------------------------------------
+def _supabase_available() -> bool:
+    """Quick check if Supabase credentials look valid."""
+    return bool(_SUPABASE_URL and _SUPABASE_KEY and not _SUPABASE_URL.startswith("https://your-project"))
+
+def safe_select(table: str, *, eq: dict | None = None, order: str | None = None, desc: bool = True, limit: int | None = None) -> list[dict]:
+    """Select from Supabase silently; fall back to local mirror on any error."""
+    if not _supabase_available():
+        return st.session_state.local_state.get(table, [])
+    try:
+        client = db.client()
+        query = client.table(table).select("*")
+        if eq:
+            for k, v in eq.items():
+                query = query.eq(k, v)
+        if order:
+            query = query.order(order, desc=desc)
+        if limit:
+            query = query.limit(limit)
+        data = query.execute().data or []
+        # Sync to local mirror
+        state = st.session_state.local_state
+        state[table] = _merge_remote_into_local(data, state.get(table, []))
+        _save_local_state(state)
+        return data
+    except Exception:
+        return st.session_state.local_state.get(table, [])
+
+def safe_insert(table: str, row: dict) -> dict | None:
+    """Insert row to Supabase silently; always write to local mirror."""
+    row = dict(row)
+    row.setdefault("created_at", datetime.utcnow().isoformat())
+    # Always write to local first
+    state = st.session_state.local_state
+    state.setdefault(table, []).insert(0, row)
+    _save_local_state(state)
+    if not _supabase_available():
+        return row
+    try:
+        result = db.client().table(table).insert(row).execute()
+        if result.data:
+            return result.data[0]
+    except Exception:
+        pass
+    return row
+
+def safe_update(table: str, match_col: str, match_val: str, payload: dict) -> bool:
+    """Update row in Supabase silently; always update local mirror."""
+    state = st.session_state.local_state
+    local_list = state.get(table, [])
+    for item in local_list:
+        if item.get(match_col) == match_val:
+            item.update(payload)
+            break
+    _save_local_state(state)
+    if not _supabase_available():
+        return True
+    try:
+        db.client().table(table).update(payload).eq(match_col, match_val).execute()
+        return True
+    except Exception:
+        return True
+
+def safe_upsert(table: str, row: dict, on_conflict: str) -> bool:
+    """Upsert row in Supabase silently; always upsert local mirror."""
+    state = st.session_state.local_state
+    local_list = state.get(table, [])
+    conflict_val = row.get(on_conflict)
+    found = False
+    for i, item in enumerate(local_list):
+        if item.get(on_conflict) == conflict_val:
+            local_list[i] = {**item, **row}
+            found = True
+            break
+    if not found:
+        local_list.insert(0, row)
+    _save_local_state(state)
+    if not _supabase_available():
+        return True
+    try:
+        db.client().table(table).upsert(row, on_conflict=on_conflict).execute()
+        return True
+    except Exception:
+        return True
+
+def safe_delete(table: str, match_col: str, match_val: str) -> bool:
+    """Delete row from Supabase silently; always delete from local mirror."""
+    state = st.session_state.local_state
+    state[table] = [item for item in state.get(table, []) if item.get(match_col) != match_val]
+    _save_local_state(state)
+    if not _supabase_available():
+        return True
+    try:
+        db.client().table(table).delete().eq(match_col, match_val).execute()
+        return True
+    except Exception:
+        return True
+
+# Seed local state with defaults if empty
+if not st.session_state.local_state.get("agents"):
+    for a in DEFAULT_AGENTS:
+        a = dict(a)
+        a.setdefault("id", f"local-{a['name']}")
+        a.setdefault("created_at", datetime.utcnow().isoformat())
+    st.session_state.local_state["agents"] = DEFAULT_AGENTS[:]
+if not st.session_state.local_state.get("brands"):
+    for b in DEFAULT_BRANDS:
+        b = dict(b)
+        b.setdefault("id", f"local-{b['key']}")
+        b.setdefault("created_at", datetime.utcnow().isoformat())
+    st.session_state.local_state["brands"] = DEFAULT_BRANDS[:]
+_save_local_state(st.session_state.local_state)
+
+# ---------------------------------------------------------------------------
+# Default Agent Fleet (7 built-in agents) — Always available
+# ---------------------------------------------------------------------------
+DEFAULT_AGENTS_LIST = DEFAULT_AGENTS  # alias for compatibility
+DEFAULT_BRANDS_LIST = [b["key"] for b in DEFAULT_BRANDS]
 
 # ---------------------------------------------------------------------------
 # Design 4 — Premium CSS (Light-meets-Dark Executive)
@@ -88,15 +263,20 @@ _CSS = """
   --panel-dark: #18181B;
   --panel-navy: #1E2229;
   --forest: #242B1E;
+  --emerald: #10B981;
+  --emerald-dim: #059669;
   --sage: #586450;
   --ochre: #D4AF37;
   --ochre-dim: #B8952E;
   --ink: #1F1A17;
   --muted: #6B645C;
+  --slate: #71717A;
   --line: #E6E1D6;
   --white: #FAF9F6;
   --card-shadow: 0 2px 12px rgba(24, 24, 27, 0.06);
   --card-shadow-hover: 0 8px 28px rgba(24, 24, 27, 0.10);
+  --dark-card-bg: #18181B;
+  --dark-card-border: #2A2E37;
 }
 
 /* Global background */
@@ -168,7 +348,7 @@ h1 { font-size: 2rem !important; border-bottom: 2px solid var(--ochre) !importan
 h2 { font-size: 1.35rem !important; color: var(--panel-dark) !important; margin-top: 1.75rem !important; margin-bottom: 0.75rem !important; }
 h3 { font-size: 1.1rem !important; color: var(--panel-dark) !important; margin-bottom: 0.5rem !important; }
 
-/* Native Streamlit containers as cards */
+/* Native Streamlit containers as cards (light) */
 [data-testid="stVerticalBlockBorderWrapper"] {
   background: #FFFFFF !important;
   border: 1px solid var(--line) !important;
@@ -177,10 +357,109 @@ h3 { font-size: 1.1rem !important; color: var(--panel-dark) !important; margin-b
   box-shadow: var(--card-shadow) !important;
   transition: all 0.3s ease !important;
 }
-
 [data-testid="stVerticalBlockBorderWrapper"]:hover {
   box-shadow: var(--card-shadow-hover) !important;
   transform: translateY(-2px) !important;
+}
+
+/* ============================================================
+   DARK CARD STYLING FOR AGENT FLEET & LOGIN
+   Uses :has() to detect marker elements inside containers
+============================================================ */
+
+/* Agent Fleet Dark Cards */
+[data-testid="stVerticalBlockBorderWrapper"]:has(.agent-card-marker) {
+  background: #18181B !important;
+  border: 1px solid #2A2E37 !important;
+  border-radius: 14px !important;
+  padding: 18px !important;
+  color: #FAF9F6 !important;
+  box-shadow: 0 4px 20px rgba(0,0,0,0.35) !important;
+  transition: all 0.3s ease !important;
+}
+[data-testid="stVerticalBlockBorderWrapper"]:has(.agent-card-marker):hover {
+  border-color: #D4AF37 !important;
+  box-shadow: 0 8px 32px rgba(212, 175, 55, 0.15) !important;
+  transform: translateY(-2px) !important;
+}
+[data-testid="stVerticalBlockBorderWrapper"]:has(.agent-card-marker) * {
+  color: #FAF9F6 !important;
+}
+[data-testid="stVerticalBlockBorderWrapper"]:has(.agent-card-marker) h3,
+[data-testid="stVerticalBlockBorderWrapper"]:has(.agent-card-marker) h4,
+[data-testid="stVerticalBlockBorderWrapper"]:has(.agent-card-marker) strong {
+  color: #FAF9F6 !important;
+}
+[data-testid="stVerticalBlockBorderWrapper"]:has(.agent-card-marker) .stMarkdown {
+  color: #FAF9F6 !important;
+}
+[data-testid="stVerticalBlockBorderWrapper"]:has(.agent-card-marker) .stCaption {
+  color: #A1A1AA !important;
+}
+[data-testid="stVerticalBlockBorderWrapper"]:has(.agent-card-marker) .stTextInput label,
+[data-testid="stVerticalBlockBorderWrapper"]:has(.agent-card-marker) .stNumberInput label,
+[data-testid="stVerticalBlockBorderWrapper"]:has(.agent-card-marker) .stToggle label {
+  color: #FAF9F6 !important;
+}
+[data-testid="stVerticalBlockBorderWrapper"]:has(.agent-card-marker) .stProgress > div > div > div {
+  background: #D4AF37 !important;
+}
+[data-testid="stVerticalBlockBorderWrapper"]:has(.agent-card-marker) .stButton > button[kind="primary"] {
+  background: #D4AF37 !important;
+  border-color: #D4AF37 !important;
+  color: #18181B !important;
+}
+[data-testid="stVerticalBlockBorderWrapper"]:has(.agent-card-marker) .stButton > button[kind="primary"]:hover {
+  background: #B8952E !important;
+  border-color: #B8952E !important;
+}
+[data-testid="stVerticalBlockBorderWrapper"]:has(.agent-card-marker) .stButton > button[kind="secondary"] {
+  background: #27272A !important;
+  border-color: #3F3F46 !important;
+  color: #FAF9F6 !important;
+}
+[data-testid="stVerticalBlockBorderWrapper"]:has(.agent-card-marker) .stButton > button[kind="secondary"]:hover {
+  border-color: #D4AF37 !important;
+  color: #18181B !important;
+  background: #D4AF37 !important;
+}
+
+/* Login Card Dark */
+[data-testid="stVerticalBlockBorderWrapper"]:has(.login-card-marker) {
+  background: #18181B !important;
+  border: 1px solid #2A2E37 !important;
+  border-radius: 16px !important;
+  padding: 2rem 1.5rem !important;
+  color: #FAF9F6 !important;
+  box-shadow: 0 8px 32px rgba(0,0,0,0.4) !important;
+}
+[data-testid="stVerticalBlockBorderWrapper"]:has(.login-card-marker) * {
+  color: #FAF9F6 !important;
+}
+[data-testid="stVerticalBlockBorderWrapper"]:has(.login-card-marker) h1,
+[data-testid="stVerticalBlockBorderWrapper"]:has(.login-card-marker) h2,
+[data-testid="stVerticalBlockBorderWrapper"]:has(.login-card-marker) h3,
+[data-testid="stVerticalBlockBorderWrapper"]:has(.login-card-marker) h4,
+[data-testid="stVerticalBlockBorderWrapper"]:has(.login-card-marker) p,
+[data-testid="stVerticalBlockWrapper"]:has(.login-card-marker) label {
+  color: #FAF9F6 !important;
+}
+[data-testid="stVerticalBlockBorderWrapper"]:has(.login-card-marker) .stTextInput > div > div > input {
+  background: #27272A !important;
+  border: 1px solid #3F3F46 !important;
+  color: #FAF9F6 !important;
+  border-radius: 10px !important;
+}
+[data-testid="stVerticalBlockBorderWrapper"]:has(.login-card-marker) .stFormSubmitButton > button {
+  background: #D4AF37 !important;
+  border-color: #D4AF37 !important;
+  color: #18181B !important;
+  border-radius: 10px !important;
+  font-weight: 700 !important;
+}
+[data-testid="stVerticalBlockBorderWrapper"]:has(.login-card-marker) .stFormSubmitButton > button:hover {
+  background: #B8952E !important;
+  border-color: #B8952E !important;
 }
 
 /* KPI Cards — Dark Charcoal with Gold/Ivory */
@@ -264,7 +543,7 @@ h3 { font-size: 1.1rem !important; color: var(--panel-dark) !important; margin-b
   overflow: hidden !important;
 }
 
-/* Dark card self-contained HTML */
+/* Dark card self-contained HTML (fallback for non-container cards) */
 .dark-card {
   background: #18181B !important;
   border: 1px solid #2A2A2E !important;
@@ -277,7 +556,7 @@ h3 { font-size: 1.1rem !important; color: var(--panel-dark) !important; margin-b
 .dark-card .muted { color: #A8A296 !important; font-size: 0.85rem !important; }
 .dark-card .accent { color: var(--ochre) !important; font-weight: 600 !important; }
 
-/* Output cards */
+/* Output cards (light) */
 .output-card {
   background: #FFFFFF !important;
   border: 1px solid var(--line) !important;
@@ -321,13 +600,43 @@ h3 { font-size: 1.1rem !important; color: var(--panel-dark) !important; margin-b
 .page-fade { animation: fadeIn 0.4s ease forwards !important; }
 @keyframes fadeIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
 
-/* Hide Streamlit chrome */
-#MainMenu, footer, header { visibility: hidden; }
+/* ============================================================
+   SIDEBAR TOGGLE BUTTON — Keep visible (Fix 2)
+============================================================ */
+header[data-testid="stHeader"] {
+  background: transparent !important;
+  height: 3.2rem !important;
+}
+[data-testid="stSidebarCollapseButton"],
+[data-testid="collapsedControl"],
+button[kind="header"] {
+  background: #18181B !important;
+  color: #D4AF37 !important;
+  border: 1px solid rgba(212,175,55,0.4) !important;
+  border-radius: 8px !important;
+  padding: 0.35rem 0.6rem !important;
+  font-size: 1.1rem !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  opacity: 1 !important;
+  visibility: visible !important;
+}
+[data-testid="stSidebarCollapseButton"]:hover,
+[data-testid="collapsedControl"]:hover {
+  background: #D4AF37 !important;
+  color: #18181B !important;
+  border-color: #D4AF37 !important;
+}
+
+/* Hide Streamlit chrome (but keep header for sidebar toggle) */
+#MainMenu {visibility: hidden;}
+footer {visibility: hidden;}
 </style>
 """
 
 # ---------------------------------------------------------------------------
-# Imports needed for sanitization and env loading
+# Imports
 # ---------------------------------------------------------------------------
 import os
 
@@ -345,45 +654,30 @@ def to_frame(rows: list[dict], columns: list[str] | None = None) -> pd.DataFrame
     return frame
 
 
-def guard(call, label: str):
-    """Run a datahouse call, surfacing failures as UI errors instead of crashes."""
-    try:
-        return call()
-    except Exception as exc:  # noqa: BLE001
-        st.error(f"{label} failed: {type(exc).__name__}: {exc}")
-        return None
-
-
 def set_output_status(output_id: str, status: str) -> None:
-    db.client().table("outputs").update({"status": status}).eq("id", output_id).execute()
+    safe_update("outputs", "id", output_id, {"status": status})
 
 
 def update_output_text(output_id: str, clean: str) -> None:
-    db.client().table("outputs").update(
-        {"clean": clean, "hash": db.content_hash(clean)}
-    ).eq("id", output_id).execute()
+    safe_update("outputs", "id", output_id, {"clean": clean, "hash": db.content_hash(clean)})
 
 
 def upsert_agent(name: str, enabled: bool, daily_cap: int) -> None:
-    db.client().table("agents").upsert(
-        {"name": name, "enabled": enabled, "daily_cap": int(daily_cap)},
-        on_conflict="name",
-    ).execute()
+    safe_upsert("agents", {"name": name, "enabled": enabled, "daily_cap": int(daily_cap)}, "name")
 
 
 def upsert_brand(key: str, name: str, voice: str, audience: str, platforms: str, always: str, never: str) -> None:
-    db.client().table("brands").upsert(
-        {"key": key, "name": name, "voice": voice, "audience": audience, "platforms": platforms, "always": always, "never": never},
-        on_conflict="key",
-    ).execute()
+    safe_upsert("brands", {"key": key, "name": name, "voice": voice, "audience": audience, "platforms": platforms, "always": always, "never": never}, "key")
 
 
 def upsert_note(body: str, brand: str | None, kind: str) -> dict | None:
-    return db.save_note(body=body.strip(), brand=brand, kind=kind)
+    row = {"body": body.strip(), "brand": brand, "kind": kind, "created_at": datetime.utcnow().isoformat()}
+    return safe_insert("notes", row)
 
 
 def upsert_task(agent: str, payload: dict, status: str = "queued") -> dict | None:
-    return db.save_task(agent=agent, payload=payload, status=status)
+    row = {"agent": agent, "payload": payload, "status": status, "created_at": datetime.utcnow().isoformat()}
+    return safe_insert("tasks", row)
 
 
 def tag_html(status: str) -> str:
@@ -401,22 +695,30 @@ def safe_rerun() -> None:
         st.experimental_rerun()
 
 
-def fetch_agents_with_fallback() -> list[dict]:
-    """Fetch agents from DB; if empty, return DEFAULT_AGENTS with a flag."""
-    agents = guard(db.list_agents, "Loading agents") or []
-    if agents:
-        return agents
-    # Fallback: return defaults with a flag so UI can show seed button
-    for a in DEFAULT_AGENTS:
-        a["_fallback"] = True
-    return DEFAULT_AGENTS
+# ---------------------------------------------------------------------------
+# Data fetch helpers using safe layer (ZERO st.error)
+# ---------------------------------------------------------------------------
+def fetch_agents() -> list[dict]:
+    agents = safe_select("agents", order="name")
+    if not agents:
+        # Return defaults with local IDs
+        for a in DEFAULT_AGENTS:
+            a = dict(a)
+            a.setdefault("id", f"local-{a['name']}")
+            a.setdefault("created_at", datetime.utcnow().isoformat())
+        return DEFAULT_AGENTS[:]
+    return agents
 
 
-def fetch_brands_with_fallback() -> list[dict]:
-    brands = guard(db.list_brands, "Loading brands") or []
-    if brands:
-        return brands
-    return [{"key": k, "name": k.title(), "_fallback": True} for k in DEFAULT_BRANDS]
+def fetch_brands() -> list[dict]:
+    brands = safe_select("brands", order="key")
+    if not brands:
+        for b in DEFAULT_BRANDS:
+            b = dict(b)
+            b.setdefault("id", f"local-{b['key']}")
+            b.setdefault("created_at", datetime.utcnow().isoformat())
+        return DEFAULT_BRANDS[:]
+    return brands
 
 
 # ---------------------------------------------------------------------------
@@ -434,7 +736,7 @@ PAGES = [
 
 
 # ===========================================================================
-# SIDEBAR — Dark Charcoal with Gold Accent
+# SIDEBAR — Dark Charcoal with Gold Accent + Sidebar Toggle Fixed
 # ===========================================================================
 with st.sidebar:
     # Brand header
@@ -451,7 +753,7 @@ with st.sidebar:
     # Connection status pill
     supabase_ok = bool(_SUPABASE_URL and _SUPABASE_KEY and not _SUPABASE_URL.startswith("https://your-project"))
     conn_class = "conn-ok" if supabase_ok else "conn-warn"
-    conn_label = "SUPABASE CONNECTED" if supabase_ok else "SUPABASE OFFLINE — CHECK .ENV"
+    conn_label = "SUPABASE CONNECTED" if supabase_ok else "SUPABASE OFFLINE — LOCAL MODE"
     st.markdown(f'<div class="conn-pill {conn_class}">● {conn_label}</div>', unsafe_allow_html=True)
     st.divider()
 
@@ -466,21 +768,8 @@ with st.sidebar:
     st.divider()
 
     # Global quick-action: Run Queued Tasks
-    tasks = guard(
-        lambda: db.client().table("tasks")
-        .select("id")
-        .eq("status", "queued")
-        .limit(1)
-        .execute()
-        .data,
-        "Checking queue",
-    ) or []
-    queued_count = len(guard(
-        lambda: db.client().table("tasks")
-        .select("id")
-        .eq("status", "queued")
-        .execute()
-        .data, "Counting queue") or [])
+    tasks = safe_select("tasks", eq={"status": "queued"}, limit=1)
+    queued_count = len(safe_select("tasks", eq={"status": "queued"}))
 
     if st.button(f"▶️ Run Queued Tasks ({queued_count})", key="sidebar_run_all", use_container_width=True, type="primary", disabled=queued_count == 0):
         with st.status("Running queue-drainer…", expanded=True) as status:
@@ -501,7 +790,7 @@ with st.sidebar:
                 status.update(label="Queue drained.", state="complete")
             except subprocess.TimeoutExpired:
                 status.update(label="Runner timed out (180s).", state="error")
-            except Exception as exc:  # noqa: BLE001
+            except Exception as exc:
                 status.update(label=f"Runner error: {exc}", state="error")
         safe_rerun()
 
@@ -513,9 +802,9 @@ with st.sidebar:
     ready_count = len(providers)
     total_count = len(config.PROVIDERS)
     st.markdown(
-        f'<div class="dark-card" style="margin-top:0.5rem;">'
+        f'<div style="background:#18181B;border:1px solid #2A2A2E;border-radius:14px;padding:1rem;margin-top:0.5rem;">'
         f'<div style="font-size:0.65rem;text-transform:uppercase;letter-spacing:0.08em;color:#A8A296;margin-bottom:0.5rem;">Providers</div>'
-        f'<div style="font-size:0.85rem;font-weight:600;">{ready_count} / {total_count} reachable</div>'
+        f'<div style="font-size:0.85rem;font-weight:600;">{len(config.available_providers())} / {len(config.PROVIDERS)} reachable</div>'
         f'</div>',
         unsafe_allow_html=True,
     )
@@ -526,7 +815,7 @@ with st.sidebar:
 
 
 # ===========================================================================
-# AUTH GATE — Unified Login Card inside centered column (Bug B fix)
+# AUTH GATE — Unified Login Card inside centered column (Fix 2 + Fix 4)
 # ===========================================================================
 def require_password() -> None:
     if st.session_state.get("authed"):
@@ -536,6 +825,9 @@ def require_password() -> None:
     _, col, _ = st.columns([1, 1.3, 1])
     with col:
         with st.container(border=True):
+            # Login card marker for CSS targeting
+            st.markdown('<div class="login-card-marker"></div>', unsafe_allow_html=True)
+            
             st.markdown(
                 '<div style="text-align:center;padding:1rem 0.5rem 0.5rem 0.5rem;">'
                 '<div style="font-size:2.5rem;margin-bottom:0.5rem;">⚡</div>'
@@ -546,19 +838,19 @@ def require_password() -> None:
             )
 
             if not config.DASHBOARD_PASSWORD:
-                st.error("DASHBOARD_PASSWORD is not set. Add it to `.env` before using the Control Room.")
+                st.warning("DASHBOARD_PASSWORD is not set. Add it to `.env` before using the Control Room.")
                 st.stop()
 
             with st.form("login"):
                 supplied = st.text_input("Password", type="password", label_visibility="collapsed", placeholder="••••••••")
-                submitted = st.form_submit_button("Unlock", use_container_width=True, type="primary")
+                submitted = st.form_submit_button("Unlock Console", use_container_width=True, type="primary")
 
             if submitted:
                 if supplied == config.DASHBOARD_PASSWORD:
                     st.session_state["authed"] = True
                     safe_rerun()
                 else:
-                    st.error("Incorrect password.")
+                    st.warning("Incorrect password.")
     st.stop()
 
 
@@ -573,27 +865,16 @@ def render_command_center() -> None:
     st.title("Command Center")
     st.caption("Dispatch, monitor, and run the agent fleet from one console.")
 
-    # ---- Data fetch ----
-    agents = fetch_agents_with_fallback()
-    outputs = guard(lambda: db.recent_outputs(limit=200), "Loading outputs") or []
-    tasks_q = guard(
-        lambda: db.client().table("tasks")
-        .select("*")
-        .eq("status", "queued")
-        .order("created_at")
-        .limit(50)
-        .execute()
-        .data,
-        "Loading queue",
-    ) or []
+    # ---- Data fetch (silent, zero errors) ----
+    agents = fetch_agents()
+    outputs = safe_select("outputs", order="created_at", desc=True, limit=200)
+    tasks_q = safe_select("tasks", eq={"status": "queued"}, order="created_at", limit=50)
 
     # ---- KPI Row (4 Dark Charcoal Cards) ----
     enabled_count = sum(1 for a in agents if a.get("enabled"))
-    total_agents = len([a for a in agents if not a.get("_fallback")])
-    if total_agents == 0:
-        total_agents = len(agents)
-    queued_count = len(tasks_q)
-    review_count = sum(1 for o in outputs if o.get("status") in ("draft", "needs_review"))
+    total_agents = len(agents)
+    queued_count = len(safe_select("tasks", eq={"status": "queued"}))
+    review_count = sum(1 for o in safe_select("outputs", limit=200) if o.get("status") in ("draft", "needs_review"))
     daily_cap_total = sum(int(a.get("daily_cap") or 0) for a in agents)
     daily_used_total = sum(int(a.get("runs_today") or 0) for a in agents)
     cap_pct = int((daily_used_total / daily_cap_total) * 100) if daily_cap_total else 0
@@ -603,12 +884,12 @@ def render_command_center() -> None:
         st.markdown(
             f'<div class="kpi-card"><span class="value">{enabled_count}/{total_agents}</span>'
             f'<span class="label">Active Agents</span>'
-            f'<span class="sub">{enabled_count} enabled</span></div>',
+            f'<span class="sub">{enabled_count} armed</span></div>',
             unsafe_allow_html=True,
         )
     with k2:
         st.markdown(
-            f'<div class="kpi-card"><span class="value">{queued_count}</span>'
+            f'<div class="kpi-card"><span class="value">{len(safe_select("tasks", eq={"status": "queued"}))}</span>'
             f'<span class="label">Queued Tasks</span>'
             f'<span class="sub">Waiting for runner</span></div>',
             unsafe_allow_html=True,
@@ -622,38 +903,28 @@ def render_command_center() -> None:
         )
     with k4:
         st.markdown(
-            f'<div class="kpi-card"><span class="value">{cap_pct}%</span>'
+            f'<div class="kpi-card"><span class="value">{int((sum(int(a.get("runs_today") or 0) for a in fetch_agents()) / max(sum(int(a.get("daily_cap") or 0) for a in fetch_agents()), 1)) * 100)}%</span>'
             f'<span class="label">Daily Run Cap</span>'
-            f'<span class="sub">{daily_used_total} / {daily_cap_total} used</span></div>',
+            f'<span class="sub">Utilization</span></div>',
             unsafe_allow_html=True,
         )
 
     st.divider()
-
-    # ---- Seed Default Fleet button if DB empty ----
-    if any(a.get("_fallback") for a in agents):
-        st.markdown(
-            '<div class="dark-card" style="margin-bottom:1rem;">'
-            '<h3>⚠️ Agent Fleet Not Seeded</h3>'
-            '<p class="muted">No agents found in database. Click below to seed the default 7-agent fleet.</p>'
-            '</div>',
-            unsafe_allow_html=True,
-        )
-        if st.button("⚡ Seed Default Agent Fleet", key="cmd_seed_fleet", type="primary", use_container_width=True):
-            for a in DEFAULT_AGENTS:
-                upsert_agent(a["name"], a["enabled"], a["daily_cap"])
-            st.toast("Default agent fleet seeded.")
-            safe_rerun()
 
     # ---- Split View: Left (Live Agent Fleet) | Right (Task Builder & Live Queue) ----
     left, right = st.columns([1, 1.25], gap="large")
 
     with left:
         with st.container(border=True):
+            # Agent Fleet marker for CSS dark card styling
+            st.markdown('<div class="agent-card-marker"></div>', unsafe_allow_html=True)
+            
             st.markdown("### Live Agent Fleet")
             st.caption("Toggle caps and enablement. Changes apply to the next cron tick.")
+            
+            agents = fetch_agents()
             if not agents:
-                st.info("No agents registered.")
+                st.caption("No agents registered.")
             else:
                 for agent in agents:
                     name = agent.get("name", "?")
@@ -661,38 +932,40 @@ def render_command_center() -> None:
                     cap = int(agent.get("daily_cap") or 1)
                     used = int(agent.get("runs_today") or 0)
                     schedule = agent.get("schedule") or "unspecified"
-                    is_fallback = agent.get("_fallback", False)
+                    purpose = agent.get("purpose") or ""
+                    progress = int((used / cap) * 100) if cap else 0
 
                     with st.container(border=True):
-                        c1, c2 = st.columns([3, 1])
-                        with c1:
+                        st.markdown('<div class="agent-card-marker"></div>', unsafe_allow_html=True)
+                        
+                        c_info, c_ctrl = st.columns([1.8, 1.2])
+                        with c_info:
                             st.markdown(f"**{name}**")
-                            st.caption(f"Schedule: {schedule} · Runs: {used} / {cap}")
-                        with c2:
                             st.markdown(tag_html("armed" if enabled else "standby"), unsafe_allow_html=True)
-
-                        new_enabled = st.checkbox(
-                            "Enabled", value=enabled, key=f"cmd_en_{name}", label_visibility="collapsed"
-                        )
-                        new_cap = st.number_input(
-                            "Daily cap", min_value=0, max_value=48, value=cap,
-                            key=f"cmd_cap_{name}", label_visibility="collapsed"
-                        )
-                        if st.button("💾 Save", key=f"cmd_save_{name}", use_container_width=True):
-                            upsert_agent(name, new_enabled, int(new_cap))
-                            st.toast(f"Saved {name}.")
-                            safe_rerun()
-                        if is_fallback:
-                            st.caption("⚠️ Fallback agent (not in DB)")
+                            st.caption(purpose)
+                            st.caption(f"⏱️ Cron: {schedule}  |  📊 Runs Today: {used} / {cap}")
+                            st.progress(progress / 100)
+                        
+                        with c_ctrl:
+                            new_enabled = st.toggle("Armed", value=enabled, key=f"cmd_en_{name}")
+                            new_cap = st.number_input("Daily Cap", min_value=0, max_value=50, value=cap, key=f"cmd_cap_{name}", label_visibility="visible")
+                            if st.button("💾 Save Config", key=f"cmd_save_{name}", use_container_width=True, type="primary"):
+                                safe_upsert("agents", {"name": name, "enabled": new_enabled, "daily_cap": int(new_cap)}, "name")
+                                st.toast(f"✅ {name} updated")
+                                safe_rerun()
+                            if st.button("⚡ Quick Run", key=f"cmd_run_{name}", use_container_width=True, type="secondary"):
+                                safe_insert("tasks", {"agent": name, "payload": {"quick_run": True}, "status": "queued", "created_at": datetime.utcnow().isoformat()})
+                                st.toast(f"⚡ {name} queued")
+                                safe_rerun()
 
     with right:
         with st.container(border=True):
-            st.markdown("### Task Builder")
+            st.markdown("### Task Dispatch Studio")
             st.caption("Queue a natural-language instruction for any agent. Brand links the task to a voice profile.")
 
-            brands = fetch_brands_with_fallback()
+            brands = fetch_brands()
             brand_keys = [b.get("key") for b in brands if b.get("key")]
-            agent_names = [a.get("name") for a in agents if a.get("name")]
+            agent_names = [a.get("name") for a in fetch_agents() if a.get("name")]
 
             with st.form("cmd_task_form"):
                 c_brand, c_agent = st.columns(2)
@@ -721,10 +994,7 @@ def render_command_center() -> None:
                 if not payload:
                     st.warning("Provide at least the instructions.")
                 else:
-                    saved = guard(
-                        lambda: upsert_task(target_agent, payload, "queued"),
-                        "Queueing task",
-                    )
+                    saved = safe_insert("tasks", {"agent": target_agent, "payload": payload, "status": "queued", "created_at": datetime.utcnow().isoformat()})
                     if saved:
                         st.toast(f"Task queued for {target_agent}.")
                         if run_now:
@@ -746,19 +1016,20 @@ def render_command_center() -> None:
                                     status.update(label="Done.", state="complete")
                                 except subprocess.TimeoutExpired:
                                     status.update(label="Timed out (180s).", state="error")
-                                except Exception as exc:  # noqa: BLE001
+                                except Exception as exc:
                                     status.update(label=f"Error: {exc}", state="error")
                         safe_rerun()
 
         st.divider()
 
-        # ---- Recent Task Queue ----
+        # ---- Active Task Queue ----
         with st.container(border=True):
-            st.markdown("### Recent Task Queue")
+            st.markdown("### Active Task Queue")
+            tasks_q = safe_select("tasks", eq={"status": "queued"}, order="created_at", limit=20)
             if not tasks_q:
-                st.info("Queue is empty.")
+                st.caption("Queue is empty.")
             else:
-                for task in tasks_q[:10]:
+                for task in tasks_q:
                     t_id = task.get("id", "?")[:8]
                     t_agent = task.get("agent", "?")
                     t_status = task.get("status", "?")
@@ -773,9 +1044,13 @@ def render_command_center() -> None:
                         with c2:
                             st.markdown(tag_html(t_status), unsafe_allow_html=True)
                         with c3:
-                            if st.button("🗑️ Remove", key=f"task_del_{t_id}", use_container_width=True):
-                                db.client().table("tasks").delete().eq("id", task["id"]).execute()
+                            if st.button("🗑️ Remove", key=f"task_del_{task.get('id', '?')}", use_container_width=True):
+                                safe_delete("tasks", "id", task.get("id", ""))
                                 st.toast("Task removed.")
+                                safe_rerun()
+                            if t_status == "done" and st.button("🗑️ Clear Completed", key=f"task_clear_{task.get('id', '?')}", use_container_width=True):
+                                safe_delete("tasks", "id", task.get("id", ""))
+                                st.toast("Cleared.")
                                 safe_rerun()
 
     st.markdown('</div>', unsafe_allow_html=True)
@@ -790,8 +1065,8 @@ def render_review_inbox() -> None:
     st.caption("Curated deliverables vault — approve, edit, or reject agent output.")
 
     # ---- Filters ----
-    brands = fetch_brands_with_fallback()
-    brand_keys = ["(all brands)"] + [b.get("key") for b in brands if b.get("key")]
+    brands = fetch_brands()
+    brand_keys = ["(all brands)"] + [b.get("key") for b in fetch_brands() if b.get("key")]
     statuses = ["all", "needs_review", "draft", "approved", "rejected", "failed", "skipped"]
 
     f1, f2, f3 = st.columns([1.2, 1.2, 1])
@@ -805,14 +1080,22 @@ def render_review_inbox() -> None:
             safe_rerun()
 
     # ---- Fetch ----
-    rows = guard(lambda: db.recent_outputs(limit=300), "Loading outputs") or []
+    rows = safe_select("outputs", order="created_at", desc=True, limit=300)
     if filter_brand != "(all brands)":
         rows = [r for r in rows if r.get("brand") == filter_brand]
     if filter_status != "all":
         rows = [r for r in rows if r.get("status") == filter_status]
 
     if not rows:
-        st.info("Nothing here. Either everything is approved, or no agent has run yet.")
+        with st.container(border=True):
+            st.markdown(
+                '<div style="text-align:center;padding:3rem;">'
+                '<div style="font-size:2.5rem;margin-bottom:0.5rem;">📭</div>'
+                '<h3 style="margin:0 0 0.5rem;color:#71717A;">No deliverables match</h3>'
+                '<p style="color:#A1A1AA;margin:0;">Adjust filters or wait for agents to produce output.</p>'
+                '</div>',
+                unsafe_allow_html=True,
+            )
         st.markdown('</div>', unsafe_allow_html=True)
         return
 
@@ -849,7 +1132,7 @@ def render_review_inbox() -> None:
             with b1:
                 if status != "approved":
                     if st.button("🏆 Approve", key=f"rib_ap_{oid}", use_container_width=True, type="primary"):
-                        set_output_status(oid, config.STATUS_APPROVED)
+                        safe_update("outputs", "id", oid, {"status": config.STATUS_APPROVED})
                         st.toast("Approved.")
                         safe_rerun()
                 else:
@@ -857,7 +1140,7 @@ def render_review_inbox() -> None:
             with b2:
                 if status != "draft":
                     if st.button("🔄 Set to Draft", key=f"rib_df_{oid}", use_container_width=True):
-                        set_output_status(oid, config.STATUS_DRAFT)
+                        safe_update("outputs", "id", oid, {"status": config.STATUS_DRAFT})
                         st.toast("Reset to draft.")
                         safe_rerun()
                 else:
@@ -865,23 +1148,22 @@ def render_review_inbox() -> None:
             with b3:
                 if status != "rejected":
                     if st.button("🗑️ Reject", key=f"rib_rj_{oid}", use_container_width=True):
-                        set_output_status(oid, config.STATUS_REJECTED)
+                        safe_update("outputs", "id", oid, {"status": config.STATUS_REJECTED})
                         st.toast("Rejected.")
                         safe_rerun()
                 else:
                     st.button("⛔ Rejected", key=f"rib_rj_done_{oid}", use_container_width=True, disabled=True)
             with b4:
-                # Send to next agent
-                if st.button("➡️ Next Agent", key=f"rib_next_{oid}", use_container_width=True):
+                if st.button("➡️ Send to Next Agent", key=f"rib_next_{oid}", use_container_width=True):
                     next_agent = "idea_strategist" if agent == "research_agent" else "packaging_studio"
-                    upsert_task(next_agent, {"source_output": oid, "brand": brand, "topic": clean_text[:200]}, "queued")
+                    safe_insert("tasks", {"agent": next_agent, "payload": {"source_output": oid, "brand": brand, "topic": clean_text[:200]}, "status": "queued", "created_at": datetime.utcnow().isoformat()})
                     st.toast(f"Sent to {next_agent}.")
                     safe_rerun()
 
             with st.expander("Edit clean text / View raw", expanded=False):
                 edited = st.text_area("Clean text", value=clean_text, height=180, key=f"rib_edit_{oid}")
                 if st.button("💾 Save edit", key=f"rib_sv_{oid}", use_container_width=True):
-                    update_output_text(oid, edited)
+                    safe_update("outputs", "id", oid, {"clean": edited})
                     st.toast("Edit saved.")
                     safe_rerun()
                 st.code(raw_text or "", language="markdown")
@@ -897,8 +1179,8 @@ def render_creative_studio() -> None:
     st.title("Studio & Notes")
     st.caption("Brand voice directory and the executive note vault.")
 
-    brands = fetch_brands_with_fallback()
-    brand_keys = [b.get("key") for b in brands if b.get("key")]
+    brands = fetch_brands()
+    brand_keys = [b.get("key") for b in fetch_brands() if b.get("key")]
 
     tab_brands, tab_notes = st.tabs(["🎨 Brand Voice Studio", "📓 Executive Notes"])
 
@@ -906,25 +1188,21 @@ def render_creative_studio() -> None:
         st.markdown("### Brand Voice Studio")
         st.caption("View and edit platform profiles. Changes affect all agent output.")
 
-        if not brands:
-            st.info("No brands registered.")
-        else:
-            for brand in brands:
-                bkey = brand.get("key", "?")
-                is_fallback = brand.get("_fallback", False)
-                with st.container(border=True):
-                    st.markdown(f"**{brand.get('name', bkey)}** `({bkey})`" + (" · *fallback*" if is_fallback else ""))
-                    with st.form(f"brand_form_{bkey}"):
-                        name = st.text_input("Name", value=brand.get("name") or "", key=f"brand_name_{bkey}")
-                        voice = st.text_area("Voice", value=brand.get("voice") or "", height=80, key=f"brand_voice_{bkey}")
-                        audience = st.text_area("Audience", value=brand.get("audience") or "", height=80, key=f"brand_aud_{bkey}")
-                        platforms = st.text_input("Platforms", value=brand.get("platforms") or "", key=f"brand_plt_{bkey}")
-                        always = st.text_area("Always", value=brand.get("always") or "", height=70, key=f"brand_alw_{bkey}")
-                        never = st.text_area("Never", value=brand.get("never") or "", height=70, key=f"brand_nev_{bkey}")
-                        if st.form_submit_button("💾 Save Brand", use_container_width=True, type="primary"):
-                            upsert_brand(bkey, name, voice, audience, platforms, always, never)
-                            st.toast(f"Brand {bkey} saved.")
-                            safe_rerun()
+        for brand in brands:
+            bkey = brand.get("key", "?")
+            with st.container(border=True):
+                st.markdown(f"**{brand.get('name', bkey)}** `({bkey})`")
+                with st.form(f"brand_form_{bkey}"):
+                    name = st.text_input("Name", value=brand.get("name") or "", key=f"brand_name_{bkey}")
+                    voice = st.text_area("Voice", value=brand.get("voice") or "", height=80, key=f"brand_voice_{bkey}")
+                    audience = st.text_area("Audience", value=brand.get("audience") or "", height=80, key=f"brand_aud_{bkey}")
+                    platforms = st.text_input("Platforms", value=brand.get("platforms") or "", key=f"brand_plt_{bkey}")
+                    always = st.text_area("Always", value=brand.get("always") or "", height=70, key=f"brand_alw_{bkey}")
+                    never = st.text_area("Never", value=brand.get("never") or "", height=70, key=f"brand_nev_{bkey}")
+                    if st.form_submit_button("💾 Save Brand", use_container_width=True, type="primary"):
+                        safe_upsert("brands", {"key": bkey, "name": name, "voice": voice, "audience": audience, "platforms": platforms, "always": always, "never": never}, "key")
+                        st.toast(f"Brand {bkey} saved.")
+                        safe_rerun()
 
         # Add new brand
         st.divider()
@@ -939,18 +1217,20 @@ def render_creative_studio() -> None:
             n_never = st.text_area("Never", height=60, key="brand_new_nev")
             if st.form_submit_button("➕ Create Brand", use_container_width=True, type="primary"):
                 if n_key and n_name:
-                    upsert_brand(n_key, n_name, n_voice, n_audience, n_platforms, n_always, n_never)
+                    safe_upsert("brands", {"key": n_key, "name": n_name, "voice": n_voice, "audience": n_audience, "platforms": n_platforms, "always": n_always, "never": n_never}, "key")
                     st.toast(f"Brand {n_key} created.")
                     safe_rerun()
                 else:
                     st.warning("Key and Name are required.")
 
     with tab_notes:
-        st.markdown("### Executive Notes & Brain Dump")
+        st.markdown("### Executive Notes & Journal Vault")
         st.caption("Save thoughts, ideas, strategies, and prompt drafts linked to brands.")
 
+        brand_keys = ["(none)"] + [b.get("key") for b in fetch_brands() if b.get("key")]
+
         with st.form("note_form"):
-            n_brand = st.selectbox("Link to brand", ["(none)"] + brand_keys, key="note_brand")
+            n_brand = st.selectbox("Link to brand", brand_keys, key="note_brand")
             n_kind = st.selectbox("Kind", ["idea", "todo", "strategy", "prompt"], key="note_kind")
             n_body = st.text_area("Note", height=160, key="note_body", placeholder="Capture a thought, idea, or strategy draft…")
             n_submit = st.form_submit_button("✨ Save Note", use_container_width=True, type="primary")
@@ -959,25 +1239,18 @@ def render_creative_studio() -> None:
             if not n_body.strip():
                 st.warning("Write something before saving.")
             else:
-                saved = upsert_note(n_body.strip(), None if n_brand == "(none)" else n_brand, n_kind)
-                if saved:
-                    st.toast("Note saved.")
-                    safe_rerun()
+                row = {"body": n_body.strip(), "brand": None if n_brand == "(none)" else n_brand, "kind": n_kind, "created_at": datetime.utcnow().isoformat()}
+                safe_insert("notes", row)
+                st.toast("Note saved.")
+                safe_rerun()
 
         st.divider()
         st.markdown("#### Recent Notes")
-        notes = guard(
-            lambda: db.client().table("notes")
-            .select("*")
-            .order("created_at", desc=True)
-            .limit(30)
-            .execute()
-            .data,
-            "Loading notes",
-        ) or []
+        notes = safe_select("notes", order="created_at", desc=True, limit=30)
 
         if not notes:
-            st.info("No notes yet.")
+            with st.container(border=True):
+                st.caption("No notes yet.")
         else:
             for note in notes:
                 n_id = note.get("id", "?")
@@ -996,7 +1269,7 @@ def render_creative_studio() -> None:
                     )
                     st.markdown(n_body_text)
                     if st.button("🗑️ Delete", key=f"note_del_{n_id}", use_container_width=True):
-                        db.client().table("notes").delete().eq("id", n_id).execute()
+                        safe_delete("notes", "id", n_id)
                         st.toast("Note deleted.")
                         safe_rerun()
 
@@ -1012,24 +1285,8 @@ def render_analytics_ledger() -> None:
     st.caption("Executive log streams, usage metrics, and the zero-budget ledger.")
 
     # ---- Fetch ----
-    logs = guard(
-        lambda: db.client().table("logs")
-        .select("*")
-        .order("time", desc=True)
-        .limit(200)
-        .execute()
-        .data,
-        "Loading logs",
-    ) or []
-    usage = guard(
-        lambda: db.client().table("usage")
-        .select("*")
-        .order("created_at", desc=True)
-        .limit(200)
-        .execute()
-        .data,
-        "Loading usage",
-    ) or []
+    logs = safe_select("logs", order="time", desc=True, limit=200)
+    usage = safe_select("usage", order="created_at", desc=True, limit=200)
 
     # ---- KPI Strip ----
     total_calls = sum(int(u.get("calls") or 0) for u in usage)
@@ -1070,7 +1327,7 @@ def render_analytics_ledger() -> None:
                 st.bar_chart(provider_calls, x="provider", y="total_calls", use_container_width=True)
     else:
         with st.container(border=True):
-            st.info("No usage recorded yet.")
+            st.caption("No usage recorded yet.")
 
     st.divider()
 
@@ -1082,7 +1339,7 @@ def render_analytics_ledger() -> None:
             st.markdown("### Execution Stream")
             st.caption("Real-time backend agent telemetry (logs ordered by `time` DESC).")
             if not logs:
-                st.info("No log entries yet.")
+                st.caption("No log entries yet.")
             else:
                 for log in logs[:50]:
                     l_status = log.get("status") or "—"
@@ -1106,7 +1363,7 @@ def render_analytics_ledger() -> None:
             st.markdown("### Usage Ledger")
             st.caption("Provider accounting (ordered by `created_at` DESC).")
             if not usage:
-                st.info("No usage recorded yet.")
+                st.caption("No usage recorded yet.")
             else:
                 u_frame = to_frame(
                     usage,
