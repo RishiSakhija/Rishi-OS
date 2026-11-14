@@ -1,4 +1,4 @@
-"""Rishi-OS Control Room — Executive SaaS Dashboard (Design 4)
+"""Rishi-OS Control Room — Executive SaaS Dashboard
 
 AGENTS.md Rule 6: this file contains ZERO AI.
 
@@ -247,36 +247,28 @@ if not st.session_state.local_state.get("brands"):
 _save_local_state(st.session_state.local_state)
 
 # ---------------------------------------------------------------------------
-# Default Agent Fleet (7 built-in agents) — Always available
-# ---------------------------------------------------------------------------
-DEFAULT_AGENTS_LIST = DEFAULT_AGENTS  # alias for compatibility
-DEFAULT_BRANDS_LIST = [b["key"] for b in DEFAULT_BRANDS]
-
-# ---------------------------------------------------------------------------
-# Design 4 — Premium CSS (Light-meets-Dark Executive)
+# Design System CSS — Executive SaaS Aesthetic
 # ---------------------------------------------------------------------------
 _CSS = """
 <style>
 :root {
-  --bg-warm: #F7F5F0;
+  --bg-warm: #F7F4EF;
   --bg-alabaster: #FAF9F6;
+  --card-ivory: #FAF9F6;
+  --card-border: #E5DFD3;
   --panel-dark: #18181B;
-  --panel-navy: #1E2229;
-  --forest: #242B1E;
-  --emerald: #10B981;
-  --emerald-dim: #059669;
-  --sage: #586450;
-  --ochre: #D4AF37;
-  --ochre-dim: #B8952E;
+  --panel-navy: #1E2025;
   --ink: #1F1A17;
   --muted: #6B645C;
-  --slate: #71717A;
-  --line: #E6E1D6;
+  --silver: #A1A1AA;
+  --ochre: #D4AF37;
+  --ochre-dim: #B8952E;
+  --emerald: #10B981;
+  --emerald-dim: #059669;
+  --line: #E5DFD3;
   --white: #FAF9F6;
   --card-shadow: 0 2px 12px rgba(24, 24, 27, 0.06);
   --card-shadow-hover: 0 8px 28px rgba(24, 24, 27, 0.10);
-  --dark-card-bg: #18181B;
-  --dark-card-border: #2A2E37;
 }
 
 /* Global background */
@@ -290,6 +282,12 @@ html, body, [data-testid="stAppViewContainer"] {
   background: var(--bg-alabaster) !important;
   padding-top: 1.25rem !important;
   max-width: 1520px !important;
+  animation: fadeIn 0.4s cubic-bezier(0.4, 0, 0.2, 1) forwards !important;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(4px); }
+  to { opacity: 1; transform: translateY(0); }
 }
 
 /* Sidebar — Dark Charcoal */
@@ -315,7 +313,7 @@ html, body, [data-testid="stAppViewContainer"] {
   text-align: left !important;
   font-size: 0.85rem !important;
   font-weight: 600 !important;
-  transition: all 0.25s ease !important;
+  transition: all 0.22s cubic-bezier(0.4, 0, 0.2, 1) !important;
   margin-bottom: 0.35rem !important;
 }
 
@@ -355,15 +353,16 @@ h3 { font-size: 1.1rem !important; color: var(--panel-dark) !important; margin-b
   border-radius: 14px !important;
   padding: 1.25rem !important;
   box-shadow: var(--card-shadow) !important;
-  transition: all 0.3s ease !important;
+  transition: all 0.22s cubic-bezier(0.4, 0, 0.2, 1) !important;
 }
+
 [data-testid="stVerticalBlockBorderWrapper"]:hover {
   box-shadow: var(--card-shadow-hover) !important;
   transform: translateY(-2px) !important;
 }
 
 /* ============================================================
-   DARK CARD STYLING FOR AGENT FLEET & LOGIN
+   DARK CARD STYLING FOR AGENT FLEET, LOGIN, KPI, PIPELINE
    Uses :has() to detect marker elements inside containers
 ============================================================ */
 
@@ -375,7 +374,7 @@ h3 { font-size: 1.1rem !important; color: var(--panel-dark) !important; margin-b
   padding: 18px !important;
   color: #FAF9F6 !important;
   box-shadow: 0 4px 20px rgba(0,0,0,0.35) !important;
-  transition: all 0.3s ease !important;
+  transition: all 0.22s cubic-bezier(0.4, 0, 0.2, 1) !important;
 }
 [data-testid="stVerticalBlockBorderWrapper"]:has(.agent-card-marker):hover {
   border-color: #D4AF37 !important;
@@ -425,7 +424,7 @@ h3 { font-size: 1.1rem !important; color: var(--panel-dark) !important; margin-b
 }
 
 /* Login Card Dark */
-[data-testid="stVerticalBlockBorderWrapper"]:has(.login-card-marker) {
+[data-testid="stVerticalBlockBorderWrapper"]:has(.login-marker) {
   background: #18181B !important;
   border: 1px solid #2A2E37 !important;
   border-radius: 16px !important;
@@ -433,31 +432,31 @@ h3 { font-size: 1.1rem !important; color: var(--panel-dark) !important; margin-b
   color: #FAF9F6 !important;
   box-shadow: 0 8px 32px rgba(0,0,0,0.4) !important;
 }
-[data-testid="stVerticalBlockBorderWrapper"]:has(.login-card-marker) * {
+[data-testid="stVerticalBlockBorderWrapper"]:has(.login-marker) * {
   color: #FAF9F6 !important;
 }
-[data-testid="stVerticalBlockBorderWrapper"]:has(.login-card-marker) h1,
-[data-testid="stVerticalBlockBorderWrapper"]:has(.login-card-marker) h2,
-[data-testid="stVerticalBlockBorderWrapper"]:has(.login-card-marker) h3,
-[data-testid="stVerticalBlockBorderWrapper"]:has(.login-card-marker) h4,
-[data-testid="stVerticalBlockBorderWrapper"]:has(.login-card-marker) p,
-[data-testid="stVerticalBlockWrapper"]:has(.login-card-marker) label {
+[data-testid="stVerticalBlockBorderWrapper"]:has(.login-marker) h1,
+[data-testid="stVerticalBlockBorderWrapper"]:has(.login-marker) h2,
+[data-testid="stVerticalBlockBorderWrapper"]:has(.login-marker) h3,
+[data-testid="stVerticalBlockBorderWrapper"]:has(.login-marker) h4,
+[data-testid="stVerticalBlockBorderWrapper"]:has(.login-marker) p,
+[data-testid="stVerticalBlockWrapper"]:has(.login-marker) label {
   color: #FAF9F6 !important;
 }
-[data-testid="stVerticalBlockBorderWrapper"]:has(.login-card-marker) .stTextInput > div > div > input {
+[data-testid="stVerticalBlockBorderWrapper"]:has(.login-marker) .stTextInput > div > div > input {
   background: #27272A !important;
   border: 1px solid #3F3F46 !important;
   color: #FAF9F6 !important;
   border-radius: 10px !important;
 }
-[data-testid="stVerticalBlockBorderWrapper"]:has(.login-card-marker) .stFormSubmitButton > button {
+[data-testid="stVerticalBlockBorderWrapper"]:has(.login-marker) .stFormSubmitButton > button {
   background: #D4AF37 !important;
   border-color: #D4AF37 !important;
   color: #18181B !important;
   border-radius: 10px !important;
   font-weight: 700 !important;
 }
-[data-testid="stVerticalBlockBorderWrapper"]:has(.login-card-marker) .stFormSubmitButton > button:hover {
+[data-testid="stVerticalBlockBorderWrapper"]:has(.login-marker) .stFormSubmitButton > button:hover {
   background: #B8952E !important;
   border-color: #B8952E !important;
 }
@@ -471,12 +470,50 @@ h3 { font-size: 1.1rem !important; color: var(--panel-dark) !important; margin-b
   text-align: center !important;
   color: var(--white) !important;
   box-shadow: 0 4px 16px rgba(0,0,0,0.35) !important;
-  transition: all 0.3s ease !important;
+  transition: all 0.22s cubic-bezier(0.4, 0, 0.2, 1) !important;
 }
 .kpi-card:hover { border-color: var(--ochre) !important; transform: translateY(-2px) !important; }
 .kpi-card .value { font-size: 1.85rem !important; font-weight: 700 !important; color: var(--white) !important; display: block !important; margin-bottom: 0.25rem !important; line-height: 1.1 !important; }
 .kpi-card .label { font-size: 0.7rem !important; text-transform: uppercase !important; letter-spacing: 0.08em !important; color: #A8A296 !important; display: block !important; }
 .kpi-card .sub { font-size: 0.75rem !important; color: var(--ochre) !important; font-weight: 600 !important; display: block !important; margin-top: 0.35rem !important; }
+
+/* Pipeline Stepper */
+.pipeline-stepper {
+  display: flex !important;
+  gap: 0.5rem !important;
+  padding: 1rem !important;
+  background: #18181B !important;
+  border: 1px solid #2A2E37 !important;
+  border-radius: 14px !important;
+  overflow-x: auto !important;
+}
+.pipeline-step {
+  flex: 1 !important;
+  min-width: 120px !important;
+  text-align: center !important;
+  padding: 0.75rem 0.5rem !important;
+  position: relative !important;
+}
+.pipeline-step:not(:last-child)::after {
+  content: "→" !important;
+  position: absolute !important;
+  right: -0.75rem !important;
+  top: 50% !important;
+  transform: translateY(-50%) !important;
+  color: #D4AF37 !important;
+  font-weight: 700 !important;
+}
+.pipeline-dot {
+  width: 14px !important; height: 14px !important; border-radius: 50% !important;
+  margin: 0 auto 0.5rem !important; border: 2px solid #3F3F46 !important;
+  background: #18181B !important; transition: all 0.22s ease !important;
+}
+.pipeline-step.armed .pipeline-dot { background: #10B981 !important; border-color: #10B981 !important; box-shadow: 0 0 8px #10B981 !important; }
+.pipeline-step.queued .pipeline-dot { background: #D4AF37 !important; border-color: #D4AF37 !important; box-shadow: 0 0 8px #D4AF37 !important; }
+.pipeline-step.standby .pipeline-dot { background: #18181B !important; border-color: #3F3F46 !important; }
+.pipeline-label { font-size: 0.7rem !important; text-transform: uppercase !important; letter-spacing: 0.06em !important; color: #A1A1AA !important; font-weight: 600 !important; }
+.pipeline-step.armed .pipeline-label { color: #10B981 !important; }
+.pipeline-step.queued .pipeline-label { color: #D4AF37 !important; }
 
 /* Status badges */
 .tag {
@@ -503,7 +540,7 @@ h3 { font-size: 1.1rem !important; color: var(--panel-dark) !important; margin-b
 .stButton > button, .stFormSubmitButton > button {
   border-radius: 10px !important;
   font-weight: 600 !important;
-  transition: all 0.25s ease !important;
+  transition: all 0.22s cubic-bezier(0.4, 0, 0.2, 1) !important;
   border: 1px solid var(--line) !important;
   background: #FFFFFF !important;
   color: var(--ink) !important;
@@ -529,12 +566,14 @@ h3 { font-size: 1.1rem !important; color: var(--panel-dark) !important; margin-b
 /* Inputs */
 .stTextInput > div > div > input,
 .stTextArea > div > div > textarea,
-.stSelectbox > div > div {
+.stSelectbox > div > div,
+.stNumberInput > div > div > input {
   background: #FFFFFF !important;
   border: 1px solid var(--line) !important;
   border-radius: 10px !important;
   color: var(--ink) !important;
 }
+.stToggle > label { color: var(--ink) !important; }
 
 /* Dataframes */
 [data-testid="stDataFrame"] {
@@ -543,7 +582,7 @@ h3 { font-size: 1.1rem !important; color: var(--panel-dark) !important; margin-b
   overflow: hidden !important;
 }
 
-/* Dark card self-contained HTML (fallback for non-container cards) */
+/* Dark card self-contained HTML (fallback) */
 .dark-card {
   background: #18181B !important;
   border: 1px solid #2A2A2E !important;
@@ -563,7 +602,7 @@ h3 { font-size: 1.1rem !important; color: var(--panel-dark) !important; margin-b
   border-radius: 14px !important;
   padding: 1.25rem !important;
   margin-bottom: 1rem !important;
-  transition: all 0.3s ease !important;
+  transition: all 0.22s cubic-bezier(0.4, 0, 0.2, 1) !important;
 }
 .output-card:hover { border-color: var(--ochre) !important; box-shadow: var(--card-shadow-hover) !important; }
 
@@ -596,10 +635,6 @@ h3 { font-size: 1.1rem !important; color: var(--panel-dark) !important; margin-b
 /* Progress bar */
 .stProgress > div > div > div { background: var(--ochre) !important; }
 
-/* Page fade */
-.page-fade { animation: fadeIn 0.4s ease forwards !important; }
-@keyframes fadeIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
-
 /* ============================================================
    SIDEBAR TOGGLE BUTTON — Keep visible (Fix 2)
 ============================================================ */
@@ -612,7 +647,7 @@ header[data-testid="stHeader"] {
 button[kind="header"] {
   background: #18181B !important;
   color: #D4AF37 !important;
-  border: 1px solid rgba(212,175,55,0.4) !important;
+  border: 1px solid rgba(212,175,55,0.45) !important;
   border-radius: 8px !important;
   padding: 0.35rem 0.6rem !important;
   font-size: 1.1rem !important;
@@ -701,7 +736,6 @@ def safe_rerun() -> None:
 def fetch_agents() -> list[dict]:
     agents = safe_select("agents", order="name")
     if not agents:
-        # Return defaults with local IDs
         for a in DEFAULT_AGENTS:
             a = dict(a)
             a.setdefault("id", f"local-{a['name']}")
@@ -753,7 +787,7 @@ with st.sidebar:
     # Connection status pill
     supabase_ok = bool(_SUPABASE_URL and _SUPABASE_KEY and not _SUPABASE_URL.startswith("https://your-project"))
     conn_class = "conn-ok" if supabase_ok else "conn-warn"
-    conn_label = "SUPABASE CONNECTED" if supabase_ok else "SUPABASE OFFLINE — LOCAL MODE"
+    conn_label = "SUPABASE CONNECTED" if supabase_ok else "LOCAL SYNC MODE"
     st.markdown(f'<div class="conn-pill {conn_class}">● {conn_label}</div>', unsafe_allow_html=True)
     st.divider()
 
@@ -815,7 +849,7 @@ with st.sidebar:
 
 
 # ===========================================================================
-# AUTH GATE — Unified Login Card inside centered column (Fix 2 + Fix 4)
+# AUTH GATE — Unified Login Card inside centered column
 # ===========================================================================
 def require_password() -> None:
     if st.session_state.get("authed"):
@@ -826,12 +860,12 @@ def require_password() -> None:
     with col:
         with st.container(border=True):
             # Login card marker for CSS targeting
-            st.markdown('<div class="login-card-marker"></div>', unsafe_allow_html=True)
+            st.markdown('<div class="login-marker"></div>', unsafe_allow_html=True)
             
             st.markdown(
                 '<div style="text-align:center;padding:1rem 0.5rem 0.5rem 0.5rem;">'
                 '<div style="font-size:2.5rem;margin-bottom:0.5rem;">⚡</div>'
-                '<h1 style="margin:0 0 0.25rem 0;font-size:1.5rem;color:#FAF9F6;">Rishi-OS</h1>'
+                '<h1 style="margin:0 0 0.25rem 0;font-size:1.5rem;color:#FAF9F6;">Rishi-OS Control Room</h1>'
                 '<p style="color:#B8B0A4;margin:0 0 1.5rem 0;font-size:0.9rem;">Executive Console</p>'
                 '</div>',
                 unsafe_allow_html=True,
@@ -871,12 +905,12 @@ def render_command_center() -> None:
     tasks_q = safe_select("tasks", eq={"status": "queued"}, order="created_at", limit=50)
 
     # ---- KPI Row (4 Dark Charcoal Cards) ----
-    enabled_count = sum(1 for a in agents if a.get("enabled"))
-    total_agents = len(agents)
+    enabled_count = sum(1 for a in fetch_agents() if a.get("enabled"))
+    total_agents = len(fetch_agents())
     queued_count = len(safe_select("tasks", eq={"status": "queued"}))
     review_count = sum(1 for o in safe_select("outputs", limit=200) if o.get("status") in ("draft", "needs_review"))
-    daily_cap_total = sum(int(a.get("daily_cap") or 0) for a in agents)
-    daily_used_total = sum(int(a.get("runs_today") or 0) for a in agents)
+    daily_cap_total = sum(int(a.get("daily_cap") or 0) for a in fetch_agents())
+    daily_used_total = sum(int(a.get("runs_today") or 0) for a in fetch_agents())
     cap_pct = int((daily_used_total / daily_cap_total) * 100) if daily_cap_total else 0
 
     k1, k2, k3, k4 = st.columns(4)
@@ -897,22 +931,66 @@ def render_command_center() -> None:
     with k3:
         st.markdown(
             f'<div class="kpi-card"><span class="value">{review_count}</span>'
-            f'<span class="label">Review Drafts</span>'
+            f'<span class="label">Drafts Ready</span>'
             f'<span class="sub">Awaiting action</span></div>',
             unsafe_allow_html=True,
         )
     with k4:
         st.markdown(
-            f'<div class="kpi-card"><span class="value">{int((sum(int(a.get("runs_today") or 0) for a in fetch_agents()) / max(sum(int(a.get("daily_cap") or 0) for a in fetch_agents()), 1)) * 100)}%</span>'
+            f'<div class="kpi-card"><span class="value">{cap_pct}%</span>'
             f'<span class="label">Daily Run Cap</span>'
-            f'<span class="sub">Utilization</span></div>',
+            f'<span class="sub">{daily_used_total} / {daily_cap_total} used</span></div>',
             unsafe_allow_html=True,
         )
 
     st.divider()
 
-    # ---- Split View: Left (Live Agent Fleet) | Right (Task Builder & Live Queue) ----
-    left, right = st.columns([1, 1.25], gap="large")
+    # ---- Visual Pipeline Stepper ----
+    pipeline_agents = [
+        ("Research", "research_agent"),
+        ("Strategist", "idea_strategist"),
+        ("Packaging", "packaging_studio"),
+        ("Outreach", "outreach_agent"),
+        ("Librarian", "summarize_librarian"),
+        ("Growth Coach", "growth_coach_agent"),
+        ("Watchdog", "system_watchdog"),
+    ]
+    agent_map = {a["name"]: a for a in fetch_agents()}
+    
+    st.markdown('<div class="pipeline-stepper">', unsafe_allow_html=True)
+    for label, name in pipeline_agents:
+        agent = agent_map.get(name)
+        if agent:
+            state = "armed" if agent.get("enabled") else "standby"
+        else:
+            state = "standby"
+        st.markdown(
+            f'<div class="pipeline-step {state}">'
+            f'<div class="pipeline-dot"></div>'
+            f'<div class="pipeline-label">{label}</div>'
+            f'</div>',
+            unsafe_allow_html=True,
+        )
+    st.markdown('</div>', unsafe_allow_html=True)
+
+    with st.expander("🔗 Queue Full End-to-End Pipeline", expanded=False):
+        st.caption("Queue a single topic across the full 7-agent pipeline.")
+        with st.form("pipeline_form"):
+            pipe_brand = st.selectbox("Brand", [b.get("key") for b in fetch_brands() if b.get("key")] or ["edivic"], key="pipe_brand")
+            pipe_topic = st.text_area("Topic / Instructions", height=100, key="pipe_topic", placeholder="e.g. Zero-budget growth tactics for early-stage AI startups")
+            if st.form_submit_button("🔗 Queue Full Pipeline", type="primary", use_container_width=True):
+                if pipe_topic.strip():
+                    # Queue research_agent first with pipeline flag
+                    safe_insert("tasks", {"agent": "research_agent", "payload": {"text": pipe_topic.strip(), "brand": pipe_brand, "pipeline": True}, "status": "queued", "created_at": datetime.utcnow().isoformat()})
+                    st.toast("Full pipeline queued!")
+                    safe_rerun()
+                else:
+                    st.warning("Provide a topic.")
+
+    st.divider()
+
+    # ---- 2-Column Bento Grid: Live Agent Fleet (Left) | Task Dispatch (Right) ----
+    left, right = st.columns([1.5, 1], gap="large")
 
     with left:
         with st.container(border=True):
@@ -926,7 +1004,8 @@ def render_command_center() -> None:
             if not agents:
                 st.caption("No agents registered.")
             else:
-                for agent in agents:
+                cols = st.columns(2)
+                for idx, agent in enumerate(agents):
                     name = agent.get("name", "?")
                     enabled = bool(agent.get("enabled"))
                     cap = int(agent.get("daily_cap") or 1)
@@ -935,28 +1014,29 @@ def render_command_center() -> None:
                     purpose = agent.get("purpose") or ""
                     progress = int((used / cap) * 100) if cap else 0
 
-                    with st.container(border=True):
-                        st.markdown('<div class="agent-card-marker"></div>', unsafe_allow_html=True)
-                        
-                        c_info, c_ctrl = st.columns([1.8, 1.2])
-                        with c_info:
-                            st.markdown(f"**{name}**")
-                            st.markdown(tag_html("armed" if enabled else "standby"), unsafe_allow_html=True)
-                            st.caption(purpose)
-                            st.caption(f"⏱️ Cron: {schedule}  |  📊 Runs Today: {used} / {cap}")
-                            st.progress(progress / 100)
-                        
-                        with c_ctrl:
-                            new_enabled = st.toggle("Armed", value=enabled, key=f"cmd_en_{name}")
-                            new_cap = st.number_input("Daily Cap", min_value=0, max_value=50, value=cap, key=f"cmd_cap_{name}", label_visibility="visible")
-                            if st.button("💾 Save Config", key=f"cmd_save_{name}", use_container_width=True, type="primary"):
-                                safe_upsert("agents", {"name": name, "enabled": new_enabled, "daily_cap": int(new_cap)}, "name")
-                                st.toast(f"✅ {name} updated")
-                                safe_rerun()
-                            if st.button("⚡ Quick Run", key=f"cmd_run_{name}", use_container_width=True, type="secondary"):
-                                safe_insert("tasks", {"agent": name, "payload": {"quick_run": True}, "status": "queued", "created_at": datetime.utcnow().isoformat()})
-                                st.toast(f"⚡ {name} queued")
-                                safe_rerun()
+                    with cols[idx % 2]:
+                        with st.container(border=True):
+                            st.markdown('<div class="agent-card-marker"></div>', unsafe_allow_html=True)
+                            
+                            c_info, c_ctrl = st.columns([1.8, 1.2])
+                            with c_info:
+                                st.markdown(f"**{name}**")
+                                st.markdown(tag_html("armed" if enabled else "standby"), unsafe_allow_html=True)
+                                st.caption(purpose)
+                                st.caption(f"⏱️ Cron: {schedule}  |  📊 Runs Today: {used} / {cap}")
+                                st.progress(progress / 100)
+                            
+                            with c_ctrl:
+                                new_enabled = st.toggle("Armed", value=enabled, key=f"cmd_en_{name}")
+                                new_cap = st.number_input("Daily Cap", min_value=0, max_value=50, value=cap, key=f"cmd_cap_{name}", label_visibility="visible")
+                                if st.button("💾 Save", key=f"cmd_save_{name}", use_container_width=True, type="primary"):
+                                    safe_upsert("agents", {"name": name, "enabled": new_enabled, "daily_cap": int(new_cap)}, "name")
+                                    st.toast(f"✅ {name} updated")
+                                    safe_rerun()
+                                if st.button("⚡ Run", key=f"cmd_run_{name}", use_container_width=True, type="secondary"):
+                                    safe_insert("tasks", {"agent": name, "payload": {"quick_run": True}, "status": "queued", "created_at": datetime.utcnow().isoformat()})
+                                    st.toast(f"⚡ {name} queued")
+                                    safe_rerun()
 
     with right:
         with st.container(border=True):
@@ -964,13 +1044,13 @@ def render_command_center() -> None:
             st.caption("Queue a natural-language instruction for any agent. Brand links the task to a voice profile.")
 
             brands = fetch_brands()
-            brand_keys = [b.get("key") for b in brands if b.get("key")]
+            brand_keys = [b.get("key") for b in fetch_brands() if b.get("key")]
             agent_names = [a.get("name") for a in fetch_agents() if a.get("name")]
 
             with st.form("cmd_task_form"):
                 c_brand, c_agent = st.columns(2)
                 with c_brand:
-                    target_brand = st.selectbox("Brand", brand_keys or ["(none)"], key="cmd_brand")
+                    target_brand = st.selectbox("Brand", brand_keys or ["edivic"], key="cmd_brand")
                 with c_agent:
                     target_agent = st.selectbox("Agent", agent_names or ["research_agent"], key="cmd_agent")
                 instructions = st.text_area(
@@ -1048,36 +1128,36 @@ def render_command_center() -> None:
                                 safe_delete("tasks", "id", task.get("id", ""))
                                 st.toast("Task removed.")
                                 safe_rerun()
-                            if t_status == "done" and st.button("🗑️ Clear Completed", key=f"task_clear_{task.get('id', '?')}", use_container_width=True):
-                                safe_delete("tasks", "id", task.get("id", ""))
-                                st.toast("Cleared.")
-                                safe_rerun()
 
     st.markdown('</div>', unsafe_allow_html=True)
 
 
 # ===========================================================================
-# PAGE 2 — REVIEW INBOX
+# PAGE 2 — REVIEW INBOX (Split-Screen Master-Detail)
 # ===========================================================================
 def render_review_inbox() -> None:
     st.markdown('<div class="page-fade">', unsafe_allow_html=True)
     st.title("Review Inbox")
-    st.caption("Curated deliverables vault — approve, edit, or reject agent output.")
+    st.caption("Split-screen curated deliverables vault — read, approve, hand off.")
 
     # ---- Filters ----
     brands = fetch_brands()
     brand_keys = ["(all brands)"] + [b.get("key") for b in fetch_brands() if b.get("key")]
     statuses = ["all", "needs_review", "draft", "approved", "rejected", "failed", "skipped"]
 
-    f1, f2, f3 = st.columns([1.2, 1.2, 1])
+    f1, f2, f3, f4 = st.columns([1.2, 1.2, 1.2, 1])
     with f1:
         filter_brand = st.selectbox("Brand", brand_keys, key="rib_brand")
     with f2:
         filter_status = st.selectbox("Status", statuses, index=0, key="rib_status")
     with f3:
+        filter_agent = st.selectbox("Agent", ["(all agents)"] + [a.get("name") for a in fetch_agents() if a.get("name")], key="rib_agent")
+    with f4:
         st.write("")
         if st.button("🔄 Refresh", key="rib_refresh", use_container_width=True):
             safe_rerun()
+
+    search_query = st.text_input("Search", placeholder="Search in deliverables…", key="rib_search")
 
     # ---- Fetch ----
     rows = safe_select("outputs", order="created_at", desc=True, limit=300)
@@ -1085,6 +1165,10 @@ def render_review_inbox() -> None:
         rows = [r for r in rows if r.get("brand") == filter_brand]
     if filter_status != "all":
         rows = [r for r in rows if r.get("status") == filter_status]
+    if filter_agent != "(all agents)":
+        rows = [r for r in rows if r.get("agent") == filter_agent]
+    if search_query:
+        rows = [r for r in rows if search_query.lower() in (r.get("clean") or r.get("raw") or "").lower()]
 
     if not rows:
         with st.container(border=True):
@@ -1099,80 +1183,118 @@ def render_review_inbox() -> None:
         st.markdown('</div>', unsafe_allow_html=True)
         return
 
-    st.markdown(f'<div class="meta-row">{len(rows)} deliverable(s) · filter: {filter_brand} / {filter_status}</div>', unsafe_allow_html=True)
+    # ---- Split-Screen Master-Detail ----
+    if "selected_output_id" not in st.session_state:
+        st.session_state.selected_output_id = rows[0].get("id") if rows else None
 
-    # ---- Cards ----
-    for row in rows:
-        oid = row.get("id", "?")
-        clean_text = row.get("clean") or row.get("raw") or ""
-        raw_text = row.get("raw") or ""
-        status = row.get("status", "draft")
-        brand = row.get("brand") or "—"
-        agent = row.get("agent") or "—"
-        provider = row.get("provider") or "—"
-        model = row.get("model") or "—"
-        source_url = row.get("source_url")
+    col_list, col_reader = st.columns([1.1, 1.9], gap="large")
 
+    with col_list:
         with st.container(border=True):
-            st.markdown(
-                f'<div class="meta-row">'
-                f'{tag_html(status)} '
-                f'<span style="font-weight:600;">{agent}</span> '
-                f'<span style="font-weight:400;opacity:0.7;">· {brand}</span>'
-                f'<span style="float:right;">{model} · {provider}</span>'
-                f'</div>',
-                unsafe_allow_html=True,
-            )
-            st.markdown(clean_text, unsafe_allow_html=False)
+            st.markdown("### Deliverable Feed")
+            st.caption(f"{len(rows)} items · click to open")
+            for row in rows:
+                oid = row.get("id", "?")
+                selected = st.session_state.selected_output_id == oid
+                status = row.get("status", "draft")
+                agent = row.get("agent", "—")
+                brand = row.get("brand") or "—"
+                ts = (row.get("created_at") or "")[:16]
+                title = (row.get("clean") or row.get("raw") or "")[:80]
+                
+                card_style = "background:#18181B;border-color:#D4AF37;" if selected else ""
+                with st.container(border=True):
+                    st.markdown(
+                        f'<div style="{card_style}">'
+                        f'{tag_html(status)} '
+                        f'<span style="font-weight:600;">{agent}</span> '
+                        f'<span style="opacity:0.7;">· {brand}</span><br>'
+                        f'<span style="opacity:0.6;font-size:0.75rem;">{ts}</span><br>'
+                        f'<span style="font-size:0.85rem;">{title}</span>'
+                        f'</div>',
+                        unsafe_allow_html=True,
+                    )
+                    if st.button("Open", key=f"rib_open_{oid}", use_container_width=True, type="primary" if selected else "secondary"):
+                        st.session_state.selected_output_id = oid
+                        safe_rerun()
 
-            if source_url:
-                st.caption(f"Source: {source_url}")
+    with col_reader:
+        selected_row = next((r for r in rows if r.get("id") == st.session_state.selected_output_id), None)
+        if not selected_row:
+            st.caption("Select a deliverable from the feed.")
+        else:
+            row = selected_row
+            oid = row.get("id", "?")
+            clean_text = row.get("clean") or row.get("raw") or ""
+            raw_text = row.get("raw") or ""
+            status = row.get("status", "draft")
+            brand = row.get("brand") or "—"
+            agent = row.get("agent") or "—"
+            provider = row.get("provider") or "—"
+            model = row.get("model") or "—"
+            source_url = row.get("source_url")
+            ts = row.get("created_at") or ""
 
-            b1, b2, b3, b4 = st.columns(4)
-            with b1:
-                if status != "approved":
-                    if st.button("🏆 Approve", key=f"rib_ap_{oid}", use_container_width=True, type="primary"):
-                        safe_update("outputs", "id", oid, {"status": config.STATUS_APPROVED})
-                        st.toast("Approved.")
-                        safe_rerun()
-                else:
-                    st.button("✅ Approved", key=f"rib_ap_done_{oid}", use_container_width=True, disabled=True)
-            with b2:
-                if status != "draft":
-                    if st.button("🔄 Set to Draft", key=f"rib_df_{oid}", use_container_width=True):
-                        safe_update("outputs", "id", oid, {"status": config.STATUS_DRAFT})
-                        st.toast("Reset to draft.")
-                        safe_rerun()
-                else:
-                    st.button("📝 Draft", key=f"rib_df_done_{oid}", use_container_width=True, disabled=True)
-            with b3:
-                if status != "rejected":
-                    if st.button("🗑️ Reject", key=f"rib_rj_{oid}", use_container_width=True):
-                        safe_update("outputs", "id", oid, {"status": config.STATUS_REJECTED})
-                        st.toast("Rejected.")
-                        safe_rerun()
-                else:
-                    st.button("⛔ Rejected", key=f"rib_rj_done_{oid}", use_container_width=True, disabled=True)
-            with b4:
-                if st.button("➡️ Send to Next Agent", key=f"rib_next_{oid}", use_container_width=True):
+            with st.container(border=True):
+                st.markdown(
+                    f'<div class="meta-row">'
+                    f'{tag_html(status)} '
+                    f'<span style="font-weight:600;">{agent}</span> '
+                    f'<span style="font-weight:400;opacity:0.7;">· {brand}</span>'
+                    f'<span style="float:right;">{model} · {provider} · {ts[:16]}</span>'
+                    f'</div>',
+                    unsafe_allow_html=True,
+                )
+                if source_url:
+                    st.caption(f"Source: {source_url}")
+                st.markdown(clean_text, unsafe_allow_html=False)
+
+                b1, b2, b3, b4 = st.columns(4)
+                with b1:
+                    if status != "approved":
+                        if st.button("🏆 Approve Winner", key=f"rib_ap_{oid}", use_container_width=True, type="primary"):
+                            safe_update("outputs", "id", oid, {"status": config.STATUS_APPROVED})
+                            st.toast("Approved.")
+                            safe_rerun()
+                    else:
+                        st.button("✅ Approved", key=f"rib_ap_done_{oid}", use_container_width=True, disabled=True)
+                with b2:
+                    if status != "draft":
+                        if st.button("🔄 Move to Draft", key=f"rib_df_{oid}", use_container_width=True):
+                            safe_update("outputs", "id", oid, {"status": config.STATUS_DRAFT})
+                            st.toast("Reset to draft.")
+                            safe_rerun()
+                    else:
+                        st.button("📝 Draft", key=f"rib_df_done_{oid}", use_container_width=True, disabled=True)
+                with b3:
+                    if status != "rejected":
+                        if st.button("🗑️ Reject", key=f"rib_rj_{oid}", use_container_width=True):
+                            safe_update("outputs", "id", oid, {"status": config.STATUS_REJECTED})
+                            st.toast("Rejected.")
+                            safe_rerun()
+                    else:
+                        st.button("⛔ Rejected", key=f"rib_rj_done_{oid}", use_container_width=True, disabled=True)
+                with b4:
+                    # Hand off to next agent
                     next_agent = "idea_strategist" if agent == "research_agent" else "packaging_studio"
-                    safe_insert("tasks", {"agent": next_agent, "payload": {"source_output": oid, "brand": brand, "topic": clean_text[:200]}, "status": "queued", "created_at": datetime.utcnow().isoformat()})
-                    st.toast(f"Sent to {next_agent}.")
-                    safe_rerun()
+                    if st.button(f"➡️ Hand Off to {next_agent}", key=f"rib_next_{oid}", use_container_width=True):
+                        safe_insert("tasks", {"agent": next_agent, "payload": {"source_output": oid, "brand": brand, "topic": clean_text[:200]}, "status": "queued", "created_at": datetime.utcnow().isoformat()})
+                        st.toast(f"Handed off to {next_agent}.")
+                        safe_rerun()
 
-            with st.expander("Edit clean text / View raw", expanded=False):
-                edited = st.text_area("Clean text", value=clean_text, height=180, key=f"rib_edit_{oid}")
-                if st.button("💾 Save edit", key=f"rib_sv_{oid}", use_container_width=True):
-                    safe_update("outputs", "id", oid, {"clean": edited})
-                    st.toast("Edit saved.")
-                    safe_rerun()
-                st.code(raw_text or "", language="markdown")
+                with st.expander("📋 1-Click Raw Copy / Edit", expanded=False):
+                    edited = st.text_area("Clean text", value=clean_text, height=180, key=f"rib_edit_{oid}")
+                    if st.button("💾 Save edit", key=f"rib_sv_{oid}", use_container_width=True):
+                        safe_update("outputs", "id", oid, {"clean": edited})
+                        st.toast("Edit saved.")
+                        safe_rerun()
+                    st.code(raw_text or "", language="markdown")
 
     st.markdown('</div>', unsafe_allow_html=True)
 
 
 # ===========================================================================
-# PAGE 3 — STUDIO & NOTES
+# PAGE 3 — STUDIO & NOTES (2-Column Split)
 # ===========================================================================
 def render_creative_studio() -> None:
     st.markdown('<div class="page-fade">', unsafe_allow_html=True)
@@ -1182,96 +1304,100 @@ def render_creative_studio() -> None:
     brands = fetch_brands()
     brand_keys = [b.get("key") for b in fetch_brands() if b.get("key")]
 
-    tab_brands, tab_notes = st.tabs(["🎨 Brand Voice Studio", "📓 Executive Notes"])
+    col_brands, col_notes = st.columns([1, 1], gap="large")
 
-    with tab_brands:
-        st.markdown("### Brand Voice Studio")
-        st.caption("View and edit platform profiles. Changes affect all agent output.")
+    with col_brands:
+        with st.container(border=True):
+            st.markdown("### Brand Voice Directory")
+            st.caption("View, edit, and create platform profiles.")
 
-        for brand in brands:
-            bkey = brand.get("key", "?")
-            with st.container(border=True):
-                st.markdown(f"**{brand.get('name', bkey)}** `({bkey})`")
-                with st.form(f"brand_form_{bkey}"):
-                    name = st.text_input("Name", value=brand.get("name") or "", key=f"brand_name_{bkey}")
-                    voice = st.text_area("Voice", value=brand.get("voice") or "", height=80, key=f"brand_voice_{bkey}")
-                    audience = st.text_area("Audience", value=brand.get("audience") or "", height=80, key=f"brand_aud_{bkey}")
-                    platforms = st.text_input("Platforms", value=brand.get("platforms") or "", key=f"brand_plt_{bkey}")
-                    always = st.text_area("Always", value=brand.get("always") or "", height=70, key=f"brand_alw_{bkey}")
-                    never = st.text_area("Never", value=brand.get("never") or "", height=70, key=f"brand_nev_{bkey}")
-                    if st.form_submit_button("💾 Save Brand", use_container_width=True, type="primary"):
-                        safe_upsert("brands", {"key": bkey, "name": name, "voice": voice, "audience": audience, "platforms": platforms, "always": always, "never": never}, "key")
-                        st.toast(f"Brand {bkey} saved.")
-                        safe_rerun()
-
-        # Add new brand
-        st.divider()
-        st.markdown("#### Add New Brand")
-        with st.form("brand_new"):
-            n_key = st.text_input("Key (slug)", key="brand_new_key", placeholder="my_brand")
-            n_name = st.text_input("Name", key="brand_new_name", placeholder="My Brand")
-            n_voice = st.text_area("Voice", height=70, key="brand_new_voice")
-            n_audience = st.text_area("Audience", height=70, key="brand_new_aud")
-            n_platforms = st.text_input("Platforms", key="brand_new_plt")
-            n_always = st.text_area("Always", height=60, key="brand_new_alw")
-            n_never = st.text_area("Never", height=60, key="brand_new_nev")
-            if st.form_submit_button("➕ Create Brand", use_container_width=True, type="primary"):
-                if n_key and n_name:
-                    safe_upsert("brands", {"key": n_key, "name": n_name, "voice": n_voice, "audience": n_audience, "platforms": n_platforms, "always": n_always, "never": n_never}, "key")
-                    st.toast(f"Brand {n_key} created.")
-                    safe_rerun()
-                else:
-                    st.warning("Key and Name are required.")
-
-    with tab_notes:
-        st.markdown("### Executive Notes & Journal Vault")
-        st.caption("Save thoughts, ideas, strategies, and prompt drafts linked to brands.")
-
-        brand_keys = ["(none)"] + [b.get("key") for b in fetch_brands() if b.get("key")]
-
-        with st.form("note_form"):
-            n_brand = st.selectbox("Link to brand", brand_keys, key="note_brand")
-            n_kind = st.selectbox("Kind", ["idea", "todo", "strategy", "prompt"], key="note_kind")
-            n_body = st.text_area("Note", height=160, key="note_body", placeholder="Capture a thought, idea, or strategy draft…")
-            n_submit = st.form_submit_button("✨ Save Note", use_container_width=True, type="primary")
-
-        if n_submit:
-            if not n_body.strip():
-                st.warning("Write something before saving.")
-            else:
-                row = {"body": n_body.strip(), "brand": None if n_brand == "(none)" else n_brand, "kind": n_kind, "created_at": datetime.utcnow().isoformat()}
-                safe_insert("notes", row)
-                st.toast("Note saved.")
-                safe_rerun()
-
-        st.divider()
-        st.markdown("#### Recent Notes")
-        notes = safe_select("notes", order="created_at", desc=True, limit=30)
-
-        if not notes:
-            with st.container(border=True):
-                st.caption("No notes yet.")
-        else:
-            for note in notes:
-                n_id = note.get("id", "?")
-                n_body_text = note.get("body") or ""
-                n_kind_val = note.get("kind") or "note"
-                n_brand_val = note.get("brand") or "—"
-                n_time = note.get("created_at") or ""
+            for brand in fetch_brands():
+                bkey = brand.get("key", "?")
                 with st.container(border=True):
-                    st.markdown(
-                        f'<div class="meta-row">'
-                        f'<span class="tag tag-{n_kind_val}">{n_kind_val.title()}</span> '
-                        f'<span style="font-weight:600;">{n_brand_val}</span> '
-                        f'<span style="opacity:0.6;">{n_time[:16]}</span>'
-                        f'</div>',
-                        unsafe_allow_html=True,
-                    )
-                    st.markdown(n_body_text)
-                    if st.button("🗑️ Delete", key=f"note_del_{n_id}", use_container_width=True):
-                        safe_delete("notes", "id", n_id)
-                        st.toast("Note deleted.")
+                    st.markdown(f"**{brand.get('name', bkey)}** `({bkey})`")
+                    with st.form(f"brand_form_{bkey}"):
+                        name = st.text_input("Name", value=brand.get("name") or "", key=f"brand_name_{bkey}")
+                        voice = st.text_area("Voice", value=brand.get("voice") or "", height=80, key=f"brand_voice_{bkey}")
+                        audience = st.text_area("Audience", value=brand.get("audience") or "", height=80, key=f"brand_aud_{bkey}")
+                        platforms = st.text_input("Platforms", value=brand.get("platforms") or "", key=f"brand_plt_{bkey}")
+                        always = st.text_area("Always", value=brand.get("always") or "", height=70, key=f"brand_alw_{bkey}")
+                        never = st.text_area("Never", value=brand.get("never") or "", height=70, key=f"brand_nev_{bkey}")
+                        if st.form_submit_button("💾 Save Brand", use_container_width=True, type="primary"):
+                            safe_upsert("brands", {"key": bkey, "name": name, "voice": voice, "audience": audience, "platforms": platforms, "always": always, "never": never}, "key")
+                            st.toast(f"Brand {bkey} saved.")
+                            safe_rerun()
+
+            # Add new brand
+            st.divider()
+            st.markdown("#### Add New Brand")
+            with st.form("brand_new"):
+                n_key = st.text_input("Key (slug)", key="brand_new_key", placeholder="my_brand")
+                n_name = st.text_input("Name", key="brand_new_name", placeholder="My Brand")
+                n_voice = st.text_area("Voice", height=70, key="brand_new_voice")
+                n_audience = st.text_area("Audience", height=70, key="brand_new_aud")
+                n_platforms = st.text_input("Platforms", key="brand_new_plt")
+                n_always = st.text_area("Always", height=60, key="brand_new_alw")
+                n_never = st.text_area("Never", height=60, key="brand_new_nev")
+                if st.form_submit_button("➕ Create Brand", use_container_width=True, type="primary"):
+                    if n_key and n_name:
+                        safe_upsert("brands", {"key": n_key, "name": n_name, "voice": n_voice, "audience": n_audience, "platforms": n_platforms, "always": n_always, "never": n_never}, "key")
+                        st.toast(f"Brand {n_key} created.")
                         safe_rerun()
+                    else:
+                        st.warning("Key and Name are required.")
+
+    with col_notes:
+        with st.container(border=True):
+            st.markdown("### Executive Notes & Journal Vault")
+            st.caption("Save thoughts, ideas, strategies, and prompt drafts linked to brands.")
+
+            brand_keys = ["(none)"] + [b.get("key") for b in fetch_brands() if b.get("key")]
+
+            with st.form("note_form"):
+                n_brand = st.selectbox("Link to brand", brand_keys, key="note_brand")
+                n_kind = st.selectbox("Kind", ["Idea", "Strategy", "Prompt", "Todo"], key="note_kind")
+                n_body = st.text_area("Note", height=160, key="note_body", placeholder="Capture a thought, idea, or strategy draft…")
+                n_submit = st.form_submit_button("✨ Save Note", use_container_width=True, type="primary")
+
+            if n_submit:
+                if not n_body.strip():
+                    st.warning("Write something before saving.")
+                else:
+                    row = {"body": n_body.strip(), "brand": None if n_brand == "(none)" else n_brand, "kind": n_kind.lower(), "created_at": datetime.utcnow().isoformat()}
+                    safe_insert("notes", row)
+                    st.toast("Note saved.")
+                    safe_rerun()
+
+            st.divider()
+            st.markdown("#### Recent Notes")
+            notes = safe_select("notes", order="created_at", desc=True, limit=30)
+
+            if not notes:
+                st.caption("No notes yet.")
+            else:
+                kind_filter = st.selectbox("Filter by kind", ["All", "Idea", "Strategy", "Prompt", "Todo"], key="note_filter")
+                filtered = notes if kind_filter == "All" else [n for n in notes if n.get("kind", "").lower() == kind_filter.lower()]
+                
+                for note in filtered:
+                    n_id = note.get("id", "?")
+                    n_body_text = note.get("body") or ""
+                    n_kind_val = note.get("kind") or "note"
+                    n_brand_val = note.get("brand") or "—"
+                    n_time = note.get("created_at") or ""
+                    with st.container(border=True):
+                        st.markdown(
+                            f'<div class="meta-row">'
+                            f'<span class="tag tag-{n_kind_val}">{n_kind_val.title()}</span> '
+                            f'<span style="font-weight:600;">{n_brand_val}</span> '
+                            f'<span style="opacity:0.6;">{n_time[:16]}</span>'
+                            f'</div>',
+                            unsafe_allow_html=True,
+                        )
+                        st.markdown(n_body_text)
+                        if st.button("🗑️ Delete", key=f"note_del_{n_id}", use_container_width=True):
+                            safe_delete("notes", "id", n_id)
+                            st.toast("Note deleted.")
+                            safe_rerun()
 
     st.markdown('</div>', unsafe_allow_html=True)
 
@@ -1288,12 +1414,13 @@ def render_analytics_ledger() -> None:
     logs = safe_select("logs", order="time", desc=True, limit=200)
     usage = safe_select("usage", order="created_at", desc=True, limit=200)
 
-    # ---- KPI Strip ----
+    # ---- KPI Strip (5 Dark Charcoal Cards) ----
     total_calls = sum(int(u.get("calls") or 0) for u in usage)
     total_chars_in = sum(int(u.get("chars_in") or 0) for u in usage)
     total_chars_out = sum(int(u.get("chars_out") or 0) for u in usage)
     total_logs = len(logs)
-    failed_logs = sum(1 for l in logs if l.get("status") == "failed")
+    success_logs = sum(1 for l in logs if l.get("status") == "ok")
+    success_rate = int((success_logs / total_logs) * 100) if total_logs else 0
 
     k1, k2, k3, k4, k5 = st.columns(5)
     with k1:
@@ -1305,16 +1432,17 @@ def render_analytics_ledger() -> None:
     with k4:
         st.markdown(f'<div class="kpi-card"><span class="value">{total_logs}</span><span class="label">Log Entries</span></div>', unsafe_allow_html=True)
     with k5:
-        st.markdown(f'<div class="kpi-card"><span class="value">{failed_logs}</span><span class="label">Failed Runs</span></div>', unsafe_allow_html=True)
+        st.markdown(f'<div class="kpi-card"><span class="value">{success_rate}%</span><span class="label">Success Rate</span></div>', unsafe_allow_html=True)
 
     st.divider()
 
-    # ---- Charts ----
+    # ---- Visual Charts Row ----
     if usage:
         usage_df = pd.DataFrame(usage)
         usage_df["provider"] = usage_df["provider"].fillna("unknown")
+        usage_df["agent"] = usage_df["agent"].fillna("unknown")
         provider_counts = usage_df.groupby("provider").size().reset_index(name="runs")
-        provider_calls = usage_df.groupby("provider")["calls"].sum().reset_index(name="total_calls")
+        agent_calls = usage_df.groupby("agent")["calls"].sum().reset_index(name="total_calls")
 
         c_left, c_right = st.columns(2)
         with c_left:
@@ -1323,20 +1451,20 @@ def render_analytics_ledger() -> None:
                 st.bar_chart(provider_counts, x="provider", y="runs", use_container_width=True)
         with c_right:
             with st.container(border=True):
-                st.markdown("### Total Calls by Provider")
-                st.bar_chart(provider_calls, x="provider", y="total_calls", use_container_width=True)
+                st.markdown("### Calls by Agent")
+                st.bar_chart(agent_calls, x="agent", y="total_calls", use_container_width=True)
     else:
         with st.container(border=True):
             st.caption("No usage recorded yet.")
 
     st.divider()
 
-    # ---- Split: Execution Stream + Usage Ledger ----
+    # ---- Bottom 2-Column Data Tables ----
     l_col, r_col = st.columns([1.1, 1], gap="large")
 
     with l_col:
         with st.container(border=True):
-            st.markdown("### Execution Stream")
+            st.markdown("### Execution Log Stream")
             st.caption("Real-time backend agent telemetry (logs ordered by `time` DESC).")
             if not logs:
                 st.caption("No log entries yet.")
