@@ -871,79 +871,182 @@ html, body, [data-testid="stAppViewContainer"] {
    DARK EXECUTIVE CARDS — via :has() markers
 ============================================================ */
 
-/* Agent Fleet Dark Cards */
-[data-testid="stVerticalBlockBorderWrapper"]:has(.agent-card-marker) {
-  background: var(--panel-obsidian) !important;
-  border: 1px solid var(--panel-border) !important;
-  border-radius: var(--radius-lg) !important;
-  padding: 20px 22px !important;
-  color: var(--white) !important;
-  box-shadow: var(--shadow-inner), var(--shadow-lg) !important;
-  transition: all var(--duration-normal) var(--ease-smooth) !important;
+/* ============================================================
+   DARK EXECUTIVE CARDS — via :has() markers (FIX 2)
+   True Dark Obsidian Charcoal cards on Pure White/Alabaster background
+============================================================ */
+
+/* Agent Fleet Dark Cards - True Dark Obsidian Charcoal */
+[data-testid="stVerticalBlockBorderWrapper"]:has(.agent-card-marker),
+div[data-testid="stContainer"]:has(.agent-card-marker),
+div.element-container:has(.agent-card-marker) > div[data-testid="stVerticalBlockBorderWrapper"] {
+  background: #141518 !important;
+  border: 1px solid #272A30 !important;
+  border-radius: 16px !important;
+  padding: 18px !important;
+  color: #FAF9F6 !important;
+  box-shadow: 0 8px 24px rgba(0,0,0,0.14) !important;
+  transition: all 0.22s cubic-bezier(0.16, 1, 0.3, 1) !important;
 }
-[data-testid="stVerticalBlockBorderWrapper"]:has(.agent-card-marker):hover {
-  border-color: var(--ochre-border) !important;
-  box-shadow: var(--shadow-inner), 0 12px 40px -12px rgba(212, 175, 55, 0.2) !important;
+[data-testid="stVerticalBlockBorderWrapper"]:has(.agent-card-marker):hover,
+div[data-testid="stContainer"]:has(.agent-card-marker):hover {
+  border-color: #D4AF37 !important;
+  box-shadow: 0 12px 32px rgba(212, 175, 55, 0.18) !important;
   transform: translateY(-2px) !important;
 }
-[data-testid="stVerticalBlockBorderWrapper"]:has(.agent-card-marker) * {
-  color: var(--white) !important;
+[data-testid="stVerticalBlockBorderWrapper"]:has(.agent-card-marker) *,
+div[data-testid="stContainer"]:has(.agent-card-marker) * {
+  color: #FAF9F6 !important;
 }
 [data-testid="stVerticalBlockBorderWrapper"]:has(.agent-card-marker) h3,
 [data-testid="stVerticalBlockBorderWrapper"]:has(.agent-card-marker) h4,
 [data-testid="stVerticalBlockBorderWrapper"]:has(.agent-card-marker) strong {
-  color: var(--white) !important;
+  color: #FAF9F6 !important;
 }
 [data-testid="stVerticalBlockBorderWrapper"]:has(.agent-card-marker) .stMarkdown {
-  color: var(--white) !important;
+  color: #FAF9F6 !important;
 }
 [data-testid="stVerticalBlockBorderWrapper"]:has(.agent-card-marker) .stCaption {
-  color: var(--silver) !important;
+  color: #A1A1AA !important;
 }
 [data-testid="stVerticalBlockBorderWrapper"]:has(.agent-card-marker) .stTextInput label,
 [data-testid="stVerticalBlockBorderWrapper"]:has(.agent-card-marker) .stNumberInput label,
 [data-testid="stVerticalBlockBorderWrapper"]:has(.agent-card-marker) .stToggle label,
-[data-testid="stVerticalBlockBorderWrapper"]:has(.agent-card-marker) .stSelectbox label {
-  color: var(--white) !important;
+[data-testid="stVerticalBlockBorderWrapper"]:has(.agent-card-marker) .stSelectbox label,
+[data-testid="stVerticalBlockBorderWrapper"]:has(.agent-card-marker) .stTextInput > div > label,
+[data-testid="stVerticalBlockBorderWrapper"]:has(.agent-card-marker) .stNumberInput > div > label,
+[data-testid="stVerticalBlockBorderWrapper"]:has(.agent-card-marker) .stToggle > label {
+  color: #FAF9F6 !important;
 }
 [data-testid="stVerticalBlockBorderWrapper"]:has(.agent-card-marker) .stProgress > div > div > div {
-  background: var(--ochre-gold) !important;
+  background: #D4AF37 !important;
 }
 [data-testid="stVerticalBlockBorderWrapper"]:has(.agent-card-marker) .stButton > button[kind="primary"] {
-  background: var(--ochre-gold) !important;
-  border-color: var(--ochre-gold) !important;
-  color: var(--panel-obsidian) !important;
+  background: #1F2229 !important;
+  color: #D4AF37 !important;
+  border: 1px solid rgba(212,175,55,0.5) !important;
 }
 [data-testid="stVerticalBlockBorderWrapper"]:has(.agent-card-marker) .stButton > button[kind="primary"]:hover {
-  background: #B89022 !important;
-  border-color: var(--ochre-gold) !important;
+  background: #272C35 !important;
+  border-color: #D4AF37 !important;
 }
 [data-testid="stVerticalBlockBorderWrapper"]:has(.agent-card-marker) .stButton > button[kind="secondary"] {
-  background: var(--panel-obsidian-elevated) !important;
-  border-color: rgba(255,255,255,0.1) !important;
-  color: var(--white) !important;
+  background: #D4AF37 !important;
+  color: #141518 !important;
+  font-weight: 600 !important;
+  border-color: #D4AF37 !important;
 }
 [data-testid="stVerticalBlockBorderWrapper"]:has(.agent-card-marker) .stButton > button[kind="secondary"]:hover {
-  border-color: var(--ochre-border) !important;
-  color: var(--panel-obsidian) !important;
-  background: var(--ochre-gold) !important;
+  background: #C9A227 !important;
+  border-color: #C9A227 !important;
+  color: #141518 !important;
 }
 
-/* Agent Fleet Inputs in Dark Cards */
+/* Agent Fleet Inputs in Dark Cards - Seamless blending */
 [data-testid="stVerticalBlockBorderWrapper"]:has(.agent-card-marker) .stNumberInput > div > div > input,
 [data-testid="stVerticalBlockBorderWrapper"]:has(.agent-card-marker) .stTextInput > div > div > input,
 [data-testid="stVerticalBlockBorderWrapper"]:has(.agent-card-marker) .stSelectbox > div > div,
 [data-testid="stVerticalBlockBorderWrapper"]:has(.agent-card-marker) .stTextArea > div > div > textarea {
-  background: var(--panel-obsidian-elevated) !important;
+  background: #1E2025 !important;
   border: 1px solid rgba(255,255,255,0.12) !important;
-  color: var(--white) !important;
-  border-radius: var(--radius-md) !important;
+  color: #FAF9F6 !important;
+  border-radius: 12px !important;
 }
 [data-testid="stVerticalBlockBorderWrapper"]:has(.agent-card-marker) .stNumberInput > div > div > input:focus,
 [data-testid="stVerticalBlockBorderWrapper"]:has(.agent-card-marker) .stTextInput > div > div > input:focus,
 [data-testid="stVerticalBlockBorderWrapper"]:has(.agent-card-marker) .stSelectbox > div > div:focus-within {
-  border-color: var(--ochre-gold) !important;
-  box-shadow: var(--shadow-gold) !important;
+  border-color: #D4AF37 !important;
+  box-shadow: 0 0 0 3px rgba(212, 175, 55, 0.15) !important;
+}
+
+/* Right panel (Task Dispatch Studio) - Clean White/Alabaster Cards */
+[data-testid="stVerticalBlockBorderWrapper"]:has(.task-dispatch-marker) {
+  background: #FFFFFF !important;
+  border: 1px solid #E5E0D5 !important;
+  border-radius: 16px !important;
+  padding: 1.5rem !important;
+  box-shadow: 0 2px 12px rgba(24, 24, 27, 0.06) !important;
+  transition: all 0.22s cubic-bezier(0.16, 1, 0.3, 1) !important;
+}
+[data-testid="stVerticalBlockBorderWrapper"]:has(.task-dispatch-marker) * {
+  color: #18181B !important;
+}
+[data-testid="stVerticalBlockBorderWrapper"]:has(.task-dispatch-marker) .stSelectbox label,
+[data-testid="stVerticalBlockBorderWrapper"]:has(.task-dispatch-marker) .stTextInput label,
+[data-testid="stVerticalBlockBorderWrapper"]:has(.task-dispatch-marker) .stTextArea label,
+[data-testid="stVerticalBlockBorderWrapper"]:has(.task-dispatch-marker) .stNumberInput label {
+  color: #18181B !important;
+}
+[data-testid="stVerticalBlockBorderWrapper"]:has(.task-dispatch-marker) .stSelectbox > div > div,
+[data-testid="stVerticalBlockBorderWrapper"]:has(.task-dispatch-marker) .stTextInput > div > div > input,
+[data-testid="stVerticalBlockBorderWrapper"]:has(.task-dispatch-marker) .stTextArea > div > div > textarea,
+[data-testid="stVerticalBlockBorderWrapper"]:has(.task-dispatch-marker) .stNumberInput > div > div > input {
+  background: #FFFFFF !important;
+  border: 1px solid #DCD5C7 !important;
+  color: #18181B !important;
+  border-radius: 10px !important;
+}
+[data-testid="stVerticalBlockBorderWrapper"]:has(.task-dispatch-marker) .stTextInput > div > div > input::placeholder,
+[data-testid="stVerticalBlockBorderWrapper"]:has(.task-dispatch-marker) .stTextArea > div > div > textarea::placeholder {
+  color: #71717A !important;
+}
+
+/* Task Queue Cards - Clean White/Alabaster */
+[data-testid="stVerticalBlockBorderWrapper"]:has(.task-queue-marker) {
+  background: #FFFFFF !important;
+  border: 1px solid #E5E0D5 !important;
+  border-radius: 16px !important;
+  padding: 1.25rem !important;
+  box-shadow: 0 2px 12px rgba(24, 24, 27, 0.06) !important;
+  transition: all 0.22s cubic-bezier(0.16, 1, 0.3, 1) !important;
+}
+[data-testid="stVerticalBlockBorderWrapper"]:has(.task-queue-marker) * {
+  color: #18181B !important;
+}
+
+/* Login Card Dark */
+[data-testid="stVerticalBlockBorderWrapper"]:has(.login-marker) {
+  background: #141518 !important;
+  border: 1px solid #272A30 !important;
+  border-radius: 20px !important;
+  padding: 2.5rem 2rem !important;
+  color: #FAF9F6 !important;
+  box-shadow: 0 10px 40px rgba(0,0,0,0.35) !important;
+}
+[data-testid="stVerticalBlockBorderWrapper"]:has(.login-marker) * {
+  color: #FAF9F6 !important;
+}
+[data-testid="stVerticalBlockBorderWrapper"]:has(.login-marker) h1,
+[data-testid="stVerticalBlockBorderWrapper"]:has(.login-marker) h2,
+[data-testid="stVerticalBlockBorderWrapper"]:has(.login-marker) h3,
+[data-testid="stVerticalBlockBorderWrapper"]:has(.login-marker) h4,
+[data-testid="stVerticalBlockBorderWrapper"]:has(.login-marker) p,
+[data-testid="stVerticalBlockWrapper"]:has(.login-marker) label {
+  color: #FAF9F6 !important;
+}
+[data-testid="stVerticalBlockBorderWrapper"]:has(.login-marker) .stTextInput > div > div > input {
+  background: #1E2025 !important;
+  border: 1px solid rgba(255,255,255,0.12) !important;
+  color: #FAF9F6 !important;
+  border-radius: 12px !important;
+}
+[data-testid="stVerticalBlockBorderWrapper"]:has(.login-marker) .stTextInput > div > div > input:focus {
+  border-color: #D4AF37 !important;
+  box-shadow: 0 0 0 3px rgba(212, 175, 55, 0.15) !important;
+}
+[data-testid="stVerticalBlockBorderWrapper"]:has(.login-marker) .stFormSubmitButton > button {
+  background: #D4AF37 !important;
+  border-color: #D4AF37 !important;
+  color: #141518 !important;
+  border-radius: 12px !important;
+  font-weight: 700 !important;
+  padding: 0.875rem 2rem !important;
+  font-size: 1rem !important;
+  letter-spacing: 0.02em !important;
+}
+[data-testid="stVerticalBlockBorderWrapper"]:has(.login-marker) .stFormSubmitButton > button:hover {
+  background: #C9A227 !important;
+  border-color: #C9A227 !important;
 }
 
 /* Login Card Dark */
@@ -1269,33 +1372,204 @@ html, body, [data-testid="stAppViewContainer"] {
 .log-line.inf { color: var(--ochre-gold) !important; }
 
 /* ============================================================
-   SIDEBAR TOGGLE BUTTON — Visible & Bespoke
+   SIDEBAR TOGGLE BUTTON — Visible & Bespoke (Fix 1)
 ============================================================ */
+/* CRITICAL: Preserve Material Symbols Rounded font for ALL Streamlit icons */
+[data-testid="stIconMaterial"],
+.material-symbols-rounded,
+span[class*="material-symbol"],
+span[class*="material-icons"],
+.stButton > button span[data-testid="stIconMaterial"],
+.stButton > button .material-symbols-rounded {
+  font-family: "Material Symbols Rounded", sans-serif !important;
+  font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24 !important;
+  font-weight: normal !important;
+  font-style: normal !important;
+  font-size: 1.25rem !important;
+  line-height: 1 !important;
+  letter-spacing: normal !important;
+  text-transform: none !important;
+  white-space: nowrap !important;
+  direction: ltr !important;
+}
+
+/* Header: transparent bg, no pointer events on header itself */
 header[data-testid="stHeader"] {
   background: transparent !important;
   height: 3.4rem !important;
+  pointer-events: none !important;
 }
-[data-testid="stSidebarCollapseButton"],
-[data-testid="collapsedControl"],
-button[kind="header"] {
+header[data-testid="stHeader"] > div {
+  pointer-events: auto !important;
+}
+
+/* Expanded state: sidebar collapse button */
+[data-testid="stSidebarCollapseButton"] button,
+header[data-testid="stHeader"] [data-testid="stSidebarCollapseButton"] button {
   background: var(--panel-obsidian) !important;
   color: var(--ochre-gold) !important;
   border: 1px solid var(--ochre-border) !important;
   border-radius: var(--radius-md) !important;
   padding: 0.4rem 0.7rem !important;
-  font-size: 1.15rem !important;
+  font-size: 1.25rem !important;
   display: flex !important;
   align-items: center !important;
   justify-content: center !important;
   opacity: 1 !important;
   visibility: visible !important;
+  z-index: 999999 !important;
+  width: 36px !important;
+  height: 36px !important;
+  min-width: 36px !important;
+  min-height: 36px !important;
+  pointer-events: auto !important;
   transition: all var(--duration-fast) var(--ease-smooth) !important;
 }
-[data-testid="stSidebarCollapseButton"]:hover,
-[data-testid="collapsedControl"]:hover {
+
+/* Collapsed state: expand sidebar button */
+[data-testid="collapsedControl"] button,
+[data-testid="stExpandSidebarButton"] button {
+  background: var(--panel-obsidian) !important;
+  color: var(--ochre-gold) !important;
+  border: 1px solid rgba(212, 175, 55, 0.45) !important;
+  border-radius: var(--radius-md) !important;
+  padding: 0.4rem 0.7rem !important;
+  font-size: 1.25rem !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  opacity: 1 !important;
+  visibility: visible !important;
+  z-index: 999999 !important;
+  width: 36px !important;
+  height: 36px !important;
+  min-width: 36px !important;
+  min-height: 36px !important;
+  pointer-events: auto !important;
+  transition: all var(--duration-fast) var(--ease-smooth) !important;
+}
+
+/* Hover states for both */
+[data-testid="stSidebarCollapseButton"] button:hover,
+[data-testid="collapsedControl"] button:hover,
+[data-testid="stExpandSidebarButton"] button:hover {
   background: var(--ochre-gold) !important;
   color: var(--panel-obsidian) !important;
   border-color: var(--ochre-gold) !important;
+}
+
+/* Ensure header allows pointer events for its button children */
+header[data-testid="stHeader"] {
+  background: transparent !important;
+  height: 3.4rem !important;
+  pointer-events: none !important;
+}
+header[data-testid="stHeader"] > div,
+header[data-testid="stHeader"] > div > div {
+  pointer-events: auto !important;
+}
+header[data-testid="stHeader"] button {
+  pointer-events: auto !important;
+}
+
+/* Preserve Material Symbols Rounded font for ALL Streamlit icons */
+[data-testid="stIconMaterial"],
+.material-symbols-rounded,
+span[class*="material-symbol"],
+span[class*="material-icons"],
+.stButton > button span[data-testid="stIconMaterial"],
+.stButton > button .material-symbols-rounded,
+.stButton > button .material-icons,
+.stButton > button [data-testid="stIconMaterial"] {
+  font-family: "Material Symbols Rounded", sans-serif !important;
+  font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24 !important;
+  font-weight: normal !important;
+  font-style: normal !important;
+  font-size: 1.25rem !important;
+  line-height: 1 !important;
+  letter-spacing: normal !important;
+  text-transform: none !important;
+  white-space: nowrap !important;
+  direction: ltr !important;
+}
+
+/* Header: transparent bg, no pointer events on header itself */
+header[data-testid="stHeader"] {
+  background: transparent !important;
+  height: 3.4rem !important;
+  pointer-events: none !important;
+}
+header[data-testid="stHeader"] > div {
+  pointer-events: auto !important;
+}
+
+/* Expanded state: sidebar collapse button */
+[data-testid="stSidebarCollapseButton"] button,
+header[data-testid="stHeader"] [data-testid="stSidebarCollapseButton"] button {
+  background: var(--panel-obsidian) !important;
+  color: var(--ochre-gold) !important;
+  border: 1px solid var(--ochre-border) !important;
+  border-radius: var(--radius-md) !important;
+  padding: 0.4rem 0.7rem !important;
+  font-size: 1.25rem !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  opacity: 1 !important;
+  visibility: visible !important;
+  z-index: 999999 !important;
+  width: 36px !important;
+  height: 36px !important;
+  min-width: 36px !important;
+  min-height: 36px !important;
+  pointer-events: auto !important;
+  transition: all var(--duration-fast) var(--ease-smooth) !important;
+}
+
+/* Collapsed state: expand sidebar button */
+[data-testid="collapsedControl"] button,
+[data-testid="stExpandSidebarButton"] button {
+  background: var(--panel-obsidian) !important;
+  color: var(--ochre-gold) !important;
+  border: 1px solid rgba(212, 175, 55, 0.45) !important;
+  border-radius: var(--radius-md) !important;
+  padding: 0.4rem 0.7rem !important;
+  font-size: 1.25rem !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  opacity: 1 !important;
+  visibility: visible !important;
+  z-index: 999999 !important;
+  width: 36px !important;
+  height: 36px !important;
+  min-width: 36px !important;
+  min-height: 36px !important;
+  pointer-events: auto !important;
+  transition: all var(--duration-fast) var(--ease-smooth) !important;
+}
+
+/* Hover states for both */
+[data-testid="stSidebarCollapseButton"] button:hover,
+[data-testid="collapsedControl"] button:hover,
+[data-testid="stExpandSidebarButton"] button:hover {
+  background: var(--ochre-gold) !important;
+  color: var(--panel-obsidian) !important;
+  border-color: var(--ochre-gold) !important;
+}
+
+/* Ensure header allows pointer events for its button children */
+header[data-testid="stHeader"] {
+  background: transparent !important;
+  height: 3.4rem !important;
+  pointer-events: none !important;
+}
+header[data-testid="stHeader"] > div,
+header[data-testid="stHeader"] > div > div {
+  pointer-events: auto !important;
+}
+header[data-testid="stHeader"] button {
+  pointer-events: auto !important;
 }
 
 /* ============================================================
@@ -1615,7 +1889,7 @@ def render_command_center() -> None:
 
     st.divider()
 
-    # ---- Visual Pipeline Stepper ----
+    # ---- Visual Pipeline Stepper (FIX 3: Single HTML string) ----
     pipeline_agents = [
         ("Research", "research_agent"),
         ("Strategist", "idea_strategist"),
@@ -1627,21 +1901,19 @@ def render_command_center() -> None:
     ]
     agent_map = {a["name"]: a for a in fetch_agents()}
     
-    st.markdown('<div class="pipeline-stepper">', unsafe_allow_html=True)
+    # Build entire pipeline stepper as single HTML string (FIX 3)
+    stepper_html = ['<div class="pipeline-stepper">']
     for label, name in pipeline_agents:
         agent = agent_map.get(name)
-        if agent:
-            state = "armed" if agent.get("enabled") else "standby"
-        else:
-            state = "standby"
-        st.markdown(
+        state = "armed" if (agent and agent.get("enabled")) else "standby"
+        stepper_html.append(
             f'<div class="pipeline-step {state}">'
             f'<div class="pipeline-dot"></div>'
             f'<div class="pipeline-label">{label}</div>'
-            f'</div>',
-            unsafe_allow_html=True,
+            f'</div>'
         )
-    st.markdown('</div>', unsafe_allow_html=True)
+    stepper_html.append('</div>')
+    st.markdown(''.join(stepper_html), unsafe_allow_html=True)
 
     with st.expander("🔗 Queue Full End-to-End Pipeline", expanded=False):
         st.caption("Queue a single topic across the full 7-agent pipeline.")
@@ -1710,6 +1982,8 @@ def render_command_center() -> None:
 
     with right:
         with st.container(border=True):
+            # Task Dispatch Studio marker for CSS light card styling
+            st.markdown('<div class="task-dispatch-marker"></div>', unsafe_allow_html=True)
             st.markdown("### Task Dispatch Studio")
             st.caption("Queue a natural-language instruction for any agent. Brand links the task to a voice profile.")
 
@@ -1774,6 +2048,8 @@ def render_command_center() -> None:
 
         # ---- Active Task Queue ----
         with st.container(border=True):
+            # Task Queue marker for CSS light card styling
+            st.markdown('<div class="task-queue-marker"></div>', unsafe_allow_html=True)
             st.markdown("### Active Task Queue")
             tasks_q = safe_select("tasks", eq={"status": "queued"}, order="created_at", limit=20)
             if not tasks_q:
