@@ -247,193 +247,716 @@ if not st.session_state.local_state.get("brands"):
 _save_local_state(st.session_state.local_state)
 
 # ---------------------------------------------------------------------------
-# Design System CSS — Executive SaaS Aesthetic
+# Design System CSS — Bespoke $10K Executive SaaS Aesthetic (Linear/Arc/Luxury Editorial)
 # ---------------------------------------------------------------------------
 _CSS = """
 <style>
+/* ============================================================
+   GOOGLE FONTS IMPORT
+============================================================ */
+@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Instrument+Serif:ital,wght@0,400;0,500;0,600;0,700;1,400;1,500&family=JetBrains+Mono:wght@400;500;600;700&display=swap');
+
 :root {
-  --bg-warm: #F7F4EF;
-  --bg-alabaster: #FAF9F6;
-  --card-ivory: #FAF9F6;
-  --card-border: #E5DFD3;
-  --panel-dark: #18181B;
-  --panel-navy: #1E2025;
-  --ink: #1F1A17;
-  --muted: #6B645C;
+  /* ============================================================
+     REFINED COLOR PALETTE — Multi-Layered Depth
+  ============================================================ */
+  /* Main Canvas */
+  --bg-warm: #F6F3EC;
+  --bg-alabaster: #FAF8F3;
+  --card-porcelain: #FCFBF9;
+  --card-border: #E6E0D4;
+  
+  /* Dark Executive Modules */
+  --panel-obsidian: #141518;
+  --panel-obsidian-elevated: #1E2025;
+  --panel-border: rgba(255,255,255,0.08);
+  --panel-specular: rgba(255,255,255,0.06);
+  
+  /* Text & Accents */
+  --ink: #1A1A2E;
+  --muted: #71717A;
   --silver: #A1A1AA;
+  --silver-dim: #71717A;
   --ochre: #D4AF37;
-  --ochre-dim: #B8952E;
+  --ochre-gold: #C9A227;
+  --ochre-wash: rgba(212, 175, 55, 0.12);
+  --ochre-border: rgba(212, 175, 55, 0.5);
   --emerald: #10B981;
   --emerald-dim: #059669;
-  --line: #E5DFD3;
+  --emerald-glow: rgba(16, 185, 129, 0.35);
+  --forest: #166534;
+  
+  /* Semantic */
+  --ink: #1A1A2E;
+  --muted: #71717A;
+  --silver: #A1A1AA;
+  --line: #E6E0D4;
   --white: #FAF9F6;
-  --card-shadow: 0 2px 12px rgba(24, 24, 27, 0.06);
-  --card-shadow-hover: 0 8px 28px rgba(24, 24, 27, 0.10);
+  --bg-warm: #F6F3EC;
+  --bg-alabaster: #FAF8F3;
+  --card-porcelain: #FCFBF9;
+  --card-border: #E6E0D4;
+  
+  /* Shadows — Multi-Layered */
+  --shadow-xs: 0 1px 2px rgba(20, 20, 30, 0.03);
+  --shadow-sm: 0 1px 3px rgba(20, 20, 30, 0.04), 0 1px 2px rgba(20, 20, 30, 0.03);
+  --shadow-md: 0 4px 12px rgba(20, 20, 30, 0.05), 0 2px 4px rgba(20, 20, 30, 0.03);
+  --shadow-lg: 0 10px 30px rgba(20, 20, 30, 0.06), 0 4px 8px rgba(20, 20, 30, 0.03);
+  --shadow-xl: 0 20px 50px -12px rgba(0, 0, 0, 0.25), 0 8px 20px rgba(0, 0, 0, 0.1);
+  --shadow-inner: inset 0 1px 0 rgba(255, 255, 255, 0.06);
+  --shadow-gold: 0 0 0 3px rgba(212, 175, 55, 0.15);
+  --shadow-emerald: 0 0 8px rgba(16, 185, 129, 0.35);
+  
+  /* Radii */
+  --radius-sm: 8px;
+  --radius-md: 12px;
+  --radius-lg: 16px;
+  --radius-xl: 20px;
+  --radius-pill: 999px;
+  
+  /* Transitions */
+  --ease-smooth: cubic-bezier(0.16, 1, 0.3, 1);
+  --ease-snappy: cubic-bezier(0.16, 1, 0.3, 1);
+  --duration-fast: 150ms;
+  --duration-normal: 220ms;
+  --duration-slow: 320ms;
 }
 
-/* Global background */
+/* ============================================================
+   GOOGLE FONTS & EDITORIAL TYPOGRAPHY HIERARCHY
+============================================================ */
+
+/* Global Font Loading & Smoothing */
 html, body, [data-testid="stAppViewContainer"] {
   background: var(--bg-warm) !important;
+  background-image: radial-gradient(circle at top right, #FAF8F3 0%, #F4F0E8 100%) !important;
   color: var(--ink) !important;
-  font-family: "Georgia", "Iowan Old Style", "Apple Garamond", serif !important;
+  font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif !important;
+  -webkit-font-smoothing: antialiased !important;
+  -moz-osx-font-smoothing: grayscale !important;
+  text-rendering: optimizeLegibility !important;
 }
 
 [data-testid="stMainBlockContainer"] {
-  background: var(--bg-alabaster) !important;
-  padding-top: 1.25rem !important;
-  max-width: 1520px !important;
-  animation: fadeIn 0.4s cubic-bezier(0.4, 0, 0.2, 1) forwards !important;
+  background: transparent !important;
+  padding-top: 1.5rem !important;
+  max-width: 1560px !important;
+  animation: fadeIn 0.5s var(--ease-smooth) forwards !important;
 }
 
 @keyframes fadeIn {
-  from { opacity: 0; transform: translateY(4px); }
+  from { opacity: 0; transform: translateY(6px); }
   to { opacity: 1; transform: translateY(0); }
 }
 
-/* Sidebar — Dark Charcoal */
+/* Editorial Typography Hierarchy */
+h1, h2, h3, h4, h5, h6 {
+  font-family: 'Instrument Serif', Georgia, 'Iowan Old Style', serif !important;
+  color: var(--ink) !important;
+  letter-spacing: -0.02em !important;
+  line-height: 1.15 !important;
+}
+
+h1 { 
+  font-size: clamp(1.75rem, 3vw, 2.25rem) !important; 
+  font-weight: 600 !important;
+  letter-spacing: -0.03em !important;
+  margin-bottom: 0.375rem !important; 
+}
+h1 + .stMarkdown > p:first-child,
+h1 + .stCaption {
+  font-family: 'Plus Jakarta Sans', sans-serif !important;
+  font-size: 0.95rem !important;
+  color: var(--muted) !important;
+  font-weight: 400 !important;
+  margin-top: -0.25rem !important;
+  margin-bottom: 1.5rem !important;
+  line-height: 1.5 !important;
+}
+
+h2 { 
+  font-size: clamp(1.25rem, 2vw, 1.5rem) !important; 
+  font-weight: 500 !important; 
+  color: var(--ink) !important; 
+  margin-top: 2rem !important; 
+  margin-bottom: 1rem !important; 
+}
+
+h3 { 
+  font-size: 1.05rem !important; 
+  font-weight: 500 !important; 
+  color: var(--ink) !important; 
+  margin-bottom: 0.625rem !important; 
+}
+
+/* Global UI Font */
+[data-testid="stSidebar"] *,
+.stButton > button,
+.stFormSubmitButton > button,
+.stSelectbox, .stTextInput, .stTextArea, .stNumberInput,
+.stToggle, .stCheckbox, .stRadio,
+.stMarkdown, .stCaption, .stAlert,
+[data-testid="stDataFrame"] {
+  font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif !important;
+}
+
+/* Monospace for Technical Data */
+code, kbd, samp,
+[data-testid="stCodeBlock"],
+.stCodeBlock,
+.log-line,
+.stMarkdown code,
+.stNumberInput input,
+.stTextInput input[type="text"],
+[data-testid="stMetricValue"],
+[data-testid="stMetricLabel"],
+.stMetric [data-testid="stMetricValue"],
+.stMetric [data-testid="stMetricLabel"] {
+  font-family: 'JetBrains Mono', 'Fira Code', 'Monaco', 'Menlo', monospace !important;
+  font-variant-numeric: tabular-nums !important;
+  font-feature-settings: "tnum" "liga" "calt" !important;
+}
+
+/* ============================================================
+   GLOBAL CANVAS & AMBIENT BACKGROUND
+============================================================ */
+html, body, [data-testid="stAppViewContainer"] {
+  background: var(--bg-warm) !important;
+  background-image: radial-gradient(ellipse 80% 50% at 100% 0%, #FAF8F3 0%, #F4F0E8 60%, #F6F3EC 100%) !important;
+  color: var(--ink) !important;
+  font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, sans-serif !important;
+  -webkit-font-smoothing: antialiased !important;
+  -moz-osx-font-smoothing: grayscale !important;
+}
+
+[data-testid="stMainBlockContainer"] {
+  background: transparent !important;
+  padding-top: 1.75rem !important;
+  max-width: 1580px !important;
+  animation: fadeIn 0.55s var(--ease-smooth) forwards !important;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+/* ============================================================
+   SIDEBAR — Obsidian Charcoal with Gold Accents
+============================================================ */
 [data-testid="stSidebar"] {
-  background: var(--panel-dark) !important;
-  border-right: 1px solid #2A2A2E !important;
-  width: 280px !important;
-  min-width: 280px !important;
+  background: var(--panel-obsidian) !important;
+  border-right: 1px solid var(--panel-border) !important;
+  width: 290px !important;
+  min-width: 290px !important;
+  box-shadow: var(--shadow-xl) !important;
 }
 
 [data-testid="stSidebar"] * {
   color: var(--white) !important;
-  font-family: "Inter", "Helvetica Neue", sans-serif !important;
+  font-family: 'Plus Jakarta Sans', sans-serif !important;
 }
 
 [data-testid="stSidebar"] .stButton > button {
   background: transparent !important;
-  border: 1px solid #333338 !important;
+  border: 1px solid rgba(255,255,255,0.08) !important;
   color: var(--white) !important;
-  border-radius: 10px !important;
-  padding: 0.65rem 1rem !important;
+  border-radius: var(--radius-md) !important;
+  padding: 0.7rem 1.1rem !important;
   width: 100% !important;
   text-align: left !important;
-  font-size: 0.85rem !important;
-  font-weight: 600 !important;
-  transition: all 0.22s cubic-bezier(0.4, 0, 0.2, 1) !important;
-  margin-bottom: 0.35rem !important;
+  font-size: 0.875rem !important;
+  font-weight: 500 !important;
+  letter-spacing: 0.01em !important;
+  transition: all var(--duration-normal) var(--ease-smooth) !important;
+  margin-bottom: 0.3rem !important;
+  background: transparent !important;
 }
 
 [data-testid="stSidebar"] .stButton > button:hover {
-  background: var(--ochre) !important;
-  border-color: var(--ochre) !important;
-  color: #18181B !important;
+  background: var(--ochre-gold) !important;
+  border-color: var(--ochre-gold) !important;
+  color: var(--panel-obsidian) !important;
   transform: translateX(4px) !important;
-  box-shadow: 0 4px 16px rgba(212, 175, 55, 0.25) !important;
+  box-shadow: 0 4px 20px rgba(212, 175, 55, 0.25) !important;
 }
 
 [data-testid="stSidebar"] .stButton > button[kind="primary"] {
-  background: var(--ochre) !important;
-  border-color: var(--ochre) !important;
-  color: #18181B !important;
+  background: var(--ochre-gold) !important;
+  border-color: var(--ochre-gold) !important;
+  color: var(--panel-obsidian) !important;
+  font-weight: 600 !important;
 }
 
 [data-testid="stSidebar"] .stButton > button[kind="primary"]:hover {
-  background: var(--ochre-dim) !important;
-  border-color: var(--ochre-dim) !important;
+  background: #B89022 !important;
+  border-color: #C9A227 !important;
 }
 
-/* Main canvas typography */
-h1, h2, h3, h4 {
-  font-family: "Georgia", "Iowan Old Style", serif !important;
-  color: var(--ink) !important;
-  letter-spacing: -0.02em !important;
-}
-h1 { font-size: 2rem !important; border-bottom: 2px solid var(--ochre) !important; padding-bottom: 0.5rem !important; margin-bottom: 1.25rem !important; }
-h2 { font-size: 1.35rem !important; color: var(--panel-dark) !important; margin-top: 1.75rem !important; margin-bottom: 0.75rem !important; }
-h3 { font-size: 1.1rem !important; color: var(--panel-dark) !important; margin-bottom: 0.5rem !important; }
-
-/* Native Streamlit containers as cards (light) */
-[data-testid="stVerticalBlockBorderWrapper"] {
-  background: #FFFFFF !important;
-  border: 1px solid var(--line) !important;
-  border-radius: 14px !important;
-  padding: 1.25rem !important;
-  box-shadow: var(--card-shadow) !important;
-  transition: all 0.22s cubic-bezier(0.4, 0, 0.2, 1) !important;
+/* Sidebar Navigation Pills — Bespoke */
+[data-testid="stSidebar"] .stButton > button[data-testid^="nav_"] {
+  display: flex !important;
+  align-items: center !important;
+  gap: 0.75rem !important;
+  padding: 0.85rem 1.25rem !important;
+  border-radius: var(--radius-lg) !important;
+  background: transparent !important;
+  border: 1px solid transparent !important;
+  margin-bottom: 0.35rem !important;
+  position: relative !important;
 }
 
-[data-testid="stVerticalBlockBorderWrapper"]:hover {
-  box-shadow: var(--card-shadow-hover) !important;
-  transform: translateY(-2px) !important;
+[data-testid="stSidebar"] .stButton > button[data-testid^="nav_"]:hover {
+  background: rgba(255,255,255,0.04) !important;
+  border-color: rgba(255,255,255,0.08) !important;
+  transform: none !important;
+  box-shadow: none !important;
+}
+
+[data-testid="stSidebar"] .stButton > button[data-testid^="nav_"][kind="primary"] {
+  background: rgba(212, 175, 55, 0.1) !important;
+  border-color: var(--ochre-border) !important;
+  background-image: linear-gradient(90deg, var(--ochre-wash) 0%, transparent 100%) !important;
+}
+
+[data-testid="stSidebar"] .stButton > button[data-testid^="nav_"][kind="primary"]::before {
+  content: '' !important;
+  position: absolute !important;
+  left: 0 !important;
+  top: 50% !important;
+  transform: translateY(-50%) !important;
+  width: 3px !important;
+  height: 60% !important;
+  background: var(--ochre-gold) !important;
+  border-radius: 0 var(--radius-md) var(--radius-md) 0 !important;
 }
 
 /* ============================================================
-   DARK CARD STYLING FOR AGENT FLEET, LOGIN, KPI, PIPELINE
-   Uses :has() to detect marker elements inside containers
+   MAIN CANVAS TYPOGRAPHY
+============================================================ */
+h1, h2, h3, h4, h5, h6 {
+  font-family: 'Instrument Serif', Georgia, 'Iowan Old Style', serif !important;
+  color: var(--ink) !important;
+  letter-spacing: -0.02em !important;
+  line-height: 1.15 !important;
+}
+
+h1 { 
+  font-size: clamp(1.85rem, 3vw, 2.35rem) !important; 
+  font-weight: 600 !important;
+  letter-spacing: -0.03em !important;
+  margin-bottom: 0.375rem !important; 
+}
+h1 + .stMarkdown > p:first-child,
+h1 + .stCaption {
+  font-family: 'Plus Jakarta Sans', sans-serif !important;
+  font-size: 0.95rem !important;
+  color: var(--muted) !important;
+  font-weight: 400 !important;
+  margin-top: -0.25rem !important;
+  margin-bottom: 1.75rem !important;
+  line-height: 1.6 !important;
+}
+
+h2 { 
+  font-size: clamp(1.25rem, 2vw, 1.5rem) !important; 
+  font-weight: 500 !important; 
+  color: var(--ink) !important; 
+  margin-top: 2.25rem !important; 
+  margin-bottom: 1.125rem !important; 
+}
+
+h3 { 
+  font-size: 1.05rem !important; 
+  font-weight: 500 !important; 
+  color: var(--ink) !important; 
+  margin-bottom: 0.75rem !important; 
+}
+
+/* Global UI Font */
+.stButton > button,
+.stFormSubmitButton > button,
+.stSelectbox, .stTextInput, .stTextArea, .stNumberInput,
+.stToggle, .stCheckbox, .stRadio,
+.stMarkdown, .stCaption, .stAlert,
+[data-testid="stDataFrame"] {
+  font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, sans-serif !important;
+}
+
+/* Monospace for Technical Data */
+code, kbd, samp,
+[data-testid="stCodeBlock"],
+.stCodeBlock,
+.log-line,
+.stMarkdown code,
+.stNumberInput input,
+.stTextInput input[type="text"],
+[data-testid="stMetricValue"],
+[data-testid="stMetricLabel"],
+.stMetric [data-testid="stMetricValue"],
+.stMetric [data-testid="stMetricLabel"] {
+  font-family: 'JetBrains Mono', 'Fira Code', 'Monaco', 'Menlo', monospace !important;
+  font-variant-numeric: tabular-nums !important;
+  font-feature-settings: "tnum" "liga" "calt" !important;
+}
+
+/* ============================================================
+   GLOBAL CANVAS & AMBIENT BACKGROUND
+============================================================ */
+html, body, [data-testid="stAppViewContainer"] {
+  background: var(--bg-warm) !important;
+  background-image: radial-gradient(ellipse 80% 50% at 100% 0%, #FAF8F3 0%, #F4F0E8 60%, #F6F3EC 100%) !important;
+  color: var(--ink) !important;
+  font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, sans-serif !important;
+  -webkit-font-smoothing: antialiased !important;
+  -moz-osx-font-smoothing: grayscale !important;
+}
+
+[data-testid="stMainBlockContainer"] {
+  background: transparent !important;
+  padding-top: 1.75rem !important;
+  max-width: 1580px !important;
+  animation: fadeIn 0.55s var(--ease-smooth) forwards !important;
+}
+
+/* ============================================================
+   SIDEBAR — Obsidian Charcoal with Gold Accents
+============================================================ */
+[data-testid="stSidebar"] {
+  background: var(--panel-obsidian) !important;
+  border-right: 1px solid var(--panel-border) !important;
+  width: 290px !important;
+  min-width: 290px !important;
+  box-shadow: var(--shadow-xl) !important;
+}
+
+[data-testid="stSidebar"] * {
+  color: var(--white) !important;
+  font-family: 'Plus Jakarta Sans', sans-serif !important;
+}
+
+/* Sidebar Navigation Pills — Bespoke */
+[data-testid="stSidebar"] .stButton > button[data-testid^="nav_"] {
+  display: flex !important;
+  align-items: center !important;
+  gap: 0.75rem !important;
+  padding: 0.85rem 1.25rem !important;
+  border-radius: var(--radius-lg) !important;
+  background: transparent !important;
+  border: 1px solid transparent !important;
+  margin-bottom: 0.35rem !important;
+  position: relative !important;
+}
+
+[data-testid="stSidebar"] .stButton > button[data-testid^="nav_"]:hover {
+  background: rgba(255,255,255,0.04) !important;
+  border-color: rgba(255,255,255,0.08) !important;
+  transform: none !important;
+  box-shadow: none !important;
+}
+
+[data-testid="stSidebar"] .stButton > button[data-testid^="nav_"][kind="primary"] {
+  background: rgba(212, 175, 55, 0.1) !important;
+  border-color: var(--ochre-border) !important;
+  background-image: linear-gradient(90deg, var(--ochre-wash) 0%, transparent 100%) !important;
+}
+
+[data-testid="stSidebar"] .stButton > button[data-testid^="nav_"][kind="primary"]::before {
+  content: '' !important;
+  position: absolute !important;
+  left: 0 !important;
+  top: 50% !important;
+  transform: translateY(-50%) !important;
+  width: 3px !important;
+  height: 60% !important;
+  background: var(--ochre-gold) !important;
+  border-radius: 0 var(--radius-md) var(--radius-md) 0 !important;
+}
+
+/* ============================================================
+   MAIN CANVAS TYPOGRAPHY
+============================================================ */
+h1, h2, h3, h4, h5, h6 {
+  font-family: 'Instrument Serif', Georgia, 'Iowan Old Style', serif !important;
+  color: var(--ink) !important;
+  letter-spacing: -0.02em !important;
+  line-height: 1.15 !important;
+}
+
+h1 { 
+  font-size: clamp(1.85rem, 3vw, 2.35rem) !important; 
+  font-weight: 600 !important;
+  letter-spacing: -0.03em !important;
+  margin-bottom: 0.375rem !important; 
+}
+h1 + .stMarkdown > p:first-child,
+h1 + .stCaption {
+  font-family: 'Plus Jakarta Sans', sans-serif !important;
+  font-size: 0.95rem !important;
+  color: var(--muted) !important;
+  font-weight: 400 !important;
+  margin-top: -0.25rem !important;
+  margin-bottom: 1.75rem !important;
+  line-height: 1.6 !important;
+}
+
+h2 { 
+  font-size: clamp(1.25rem, 2vw, 1.5rem) !important; 
+  font-weight: 500 !important; 
+  color: var(--ink) !important; 
+  margin-top: 2.25rem !important; 
+  margin-bottom: 1.125rem !important; 
+}
+
+h3 { 
+  font-size: 1.05rem !important; 
+  font-weight: 500 !important; 
+  color: var(--ink) !important; 
+  margin-bottom: 0.75rem !important; 
+}
+
+/* Global UI Font */
+.stButton > button,
+.stFormSubmitButton > button,
+.stSelectbox, .stTextInput, .stTextArea, .stNumberInput,
+.stToggle, .stCheckbox, .stRadio,
+.stMarkdown, .stCaption, .stAlert,
+[data-testid="stDataFrame"] {
+  font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, sans-serif !important;
+}
+
+/* Monospace for Technical Data */
+code, kbd, samp,
+[data-testid="stCodeBlock"],
+.stCodeBlock,
+.log-line,
+.stMarkdown code,
+.stNumberInput input,
+.stTextInput input[type="text"],
+[data-testid="stMetricValue"],
+[data-testid="stMetricLabel"],
+.stMetric [data-testid="stMetricValue"],
+.stMetric [data-testid="stMetricLabel"] {
+  font-family: 'JetBrains Mono', 'Fira Code', 'Monaco', 'Menlo', monospace !important;
+  font-variant-numeric: tabular-nums !important;
+  font-feature-settings: "tnum" "liga" "calt" !important;
+}
+
+/* ============================================================
+   GLOBAL CANVAS & AMBIENT BACKGROUND
+============================================================ */
+html, body, [data-testid="stAppViewContainer"] {
+  background: var(--bg-warm) !important;
+  background-image: radial-gradient(ellipse 80% 50% at 100% 0%, #FAF8F3 0%, #F4F0E8 60%, #F6F3EC 100%) !important;
+  color: var(--ink) !important;
+  font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, sans-serif !important;
+  -webkit-font-smoothing: antialiased !important;
+  -moz-osx-font-smoothing: grayscale !important;
+}
+
+[data-testid="stMainBlockContainer"] {
+  background: transparent !important;
+  padding-top: 1.75rem !important;
+  max-width: 1580px !important;
+  animation: fadeIn 0.55s var(--ease-smooth) forwards !important;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+/* ============================================================
+   SIDEBAR — Obsidian Charcoal with Gold Accents
+============================================================ */
+[data-testid="stSidebar"] {
+  background: var(--panel-obsidian) !important;
+  border-right: 1px solid var(--panel-border) !important;
+  width: 290px !important;
+  min-width: 290px !important;
+  box-shadow: var(--shadow-xl) !important;
+}
+
+[data-testid="stSidebar"] * {
+  color: var(--white) !important;
+  font-family: 'Plus Jakarta Sans', sans-serif !important;
+}
+
+/* Sidebar Navigation Pills — Bespoke */
+[data-testid="stSidebar"] .stButton > button[data-testid^="nav_"] {
+  display: flex !important;
+  align-items: center !important;
+  gap: 0.75rem !important;
+  padding: 0.85rem 1.25rem !important;
+  border-radius: var(--radius-lg) !important;
+  background: transparent !important;
+  border: 1px solid transparent !important;
+  margin-bottom: 0.35rem !important;
+  position: relative !important;
+}
+
+[data-testid="stSidebar"] .stButton > button[data-testid^="nav_"]:hover {
+  background: rgba(255,255,255,0.04) !important;
+  border-color: rgba(255,255,255,0.08) !important;
+  transform: none !important;
+  box-shadow: none !important;
+}
+
+[data-testid="stSidebar"] .stButton > button[data-testid^="nav_"][kind="primary"] {
+  background: rgba(212, 175, 55, 0.1) !important;
+  border-color: var(--ochre-border) !important;
+  background-image: linear-gradient(90deg, var(--ochre-wash) 0%, transparent 100%) !important;
+}
+
+[data-testid="stSidebar"] .stButton > button[data-testid^="nav_"][kind="primary"]::before {
+  content: '' !important;
+  position: absolute !important;
+  left: 0 !important;
+  top: 50% !important;
+  transform: translateY(-50%) !important;
+  width: 3px !important;
+  height: 60% !important;
+  background: var(--ochre-gold) !important;
+  border-radius: 0 var(--radius-md) var(--radius-md) 0 !important;
+}
+
+/* Sidebar Header & Status Pill */
+[data-testid="stSidebar"] > div:first-child {
+  padding: 1.75rem 1.25rem 1rem 1.25rem !important;
+}
+
+[data-testid="stSidebar"] .conn-pill {
+  display: inline-flex !important;
+  align-items: center !important;
+  gap: 0.5rem !important;
+  padding: 0.4rem 1rem !important;
+  border-radius: var(--radius-pill) !important;
+  font-size: 0.7rem !important;
+  font-weight: 600 !important;
+  text-transform: uppercase !important;
+  letter-spacing: 0.08em !important;
+  font-family: 'Plus Jakarta Sans', sans-serif !important;
+}
+.conn-ok { background: rgba(16, 185, 129, 0.15) !important; color: var(--emerald) !important; border: 1px solid rgba(16, 185, 129, 0.3) !important; }
+.conn-warn { background: var(--ochre-wash) !important; color: var(--ochre-gold) !important; border: 1px solid var(--ochre-border) !important; }
+
+/* Providers status card */
+[data-testid="stSidebar"] > div:last-of-type > div:last-child {
+  background: var(--panel-obsidian-elevated) !important;
+  border: 1px solid var(--panel-border) !important;
+  border-radius: var(--radius-lg) !important;
+  padding: 1rem 1.25rem !important;
+  margin-top: 1rem !important;
+}
+
+/* ============================================================
+   NATIVE STREAMLIT CONTAINERS — Elevated Light Cards
+============================================================ */
+[data-testid="stVerticalBlockBorderWrapper"] {
+  background: var(--card-porcelain) !important;
+  border: 1px solid var(--card-border) !important;
+  border-radius: var(--radius-lg) !important;
+  padding: 1.5rem !important;
+  box-shadow: var(--shadow-sm) !important;
+  transition: all var(--duration-normal) var(--ease-smooth) !important;
+}
+
+[data-testid="stVerticalBlockBorderWrapper"]:hover {
+  box-shadow: var(--shadow-md) !important;
+  transform: translateY(-1px) !important;
+  border-color: var(--ochre-border) !important;
+}
+
+/* ============================================================
+   DARK EXECUTIVE CARDS — via :has() markers
 ============================================================ */
 
 /* Agent Fleet Dark Cards */
 [data-testid="stVerticalBlockBorderWrapper"]:has(.agent-card-marker) {
-  background: #18181B !important;
-  border: 1px solid #2A2E37 !important;
-  border-radius: 14px !important;
-  padding: 18px !important;
-  color: #FAF9F6 !important;
-  box-shadow: 0 4px 20px rgba(0,0,0,0.35) !important;
-  transition: all 0.22s cubic-bezier(0.4, 0, 0.2, 1) !important;
+  background: var(--panel-obsidian) !important;
+  border: 1px solid var(--panel-border) !important;
+  border-radius: var(--radius-lg) !important;
+  padding: 20px 22px !important;
+  color: var(--white) !important;
+  box-shadow: var(--shadow-inner), var(--shadow-lg) !important;
+  transition: all var(--duration-normal) var(--ease-smooth) !important;
 }
 [data-testid="stVerticalBlockBorderWrapper"]:has(.agent-card-marker):hover {
-  border-color: #D4AF37 !important;
-  box-shadow: 0 8px 32px rgba(212, 175, 55, 0.15) !important;
+  border-color: var(--ochre-border) !important;
+  box-shadow: var(--shadow-inner), 0 12px 40px -12px rgba(212, 175, 55, 0.2) !important;
   transform: translateY(-2px) !important;
 }
 [data-testid="stVerticalBlockBorderWrapper"]:has(.agent-card-marker) * {
-  color: #FAF9F6 !important;
+  color: var(--white) !important;
 }
 [data-testid="stVerticalBlockBorderWrapper"]:has(.agent-card-marker) h3,
 [data-testid="stVerticalBlockBorderWrapper"]:has(.agent-card-marker) h4,
 [data-testid="stVerticalBlockBorderWrapper"]:has(.agent-card-marker) strong {
-  color: #FAF9F6 !important;
+  color: var(--white) !important;
 }
 [data-testid="stVerticalBlockBorderWrapper"]:has(.agent-card-marker) .stMarkdown {
-  color: #FAF9F6 !important;
+  color: var(--white) !important;
 }
 [data-testid="stVerticalBlockBorderWrapper"]:has(.agent-card-marker) .stCaption {
-  color: #A1A1AA !important;
+  color: var(--silver) !important;
 }
 [data-testid="stVerticalBlockBorderWrapper"]:has(.agent-card-marker) .stTextInput label,
 [data-testid="stVerticalBlockBorderWrapper"]:has(.agent-card-marker) .stNumberInput label,
-[data-testid="stVerticalBlockBorderWrapper"]:has(.agent-card-marker) .stToggle label {
-  color: #FAF9F6 !important;
+[data-testid="stVerticalBlockBorderWrapper"]:has(.agent-card-marker) .stToggle label,
+[data-testid="stVerticalBlockBorderWrapper"]:has(.agent-card-marker) .stSelectbox label {
+  color: var(--white) !important;
 }
 [data-testid="stVerticalBlockBorderWrapper"]:has(.agent-card-marker) .stProgress > div > div > div {
-  background: #D4AF37 !important;
+  background: var(--ochre-gold) !important;
 }
 [data-testid="stVerticalBlockBorderWrapper"]:has(.agent-card-marker) .stButton > button[kind="primary"] {
-  background: #D4AF37 !important;
-  border-color: #D4AF37 !important;
-  color: #18181B !important;
+  background: var(--ochre-gold) !important;
+  border-color: var(--ochre-gold) !important;
+  color: var(--panel-obsidian) !important;
 }
 [data-testid="stVerticalBlockBorderWrapper"]:has(.agent-card-marker) .stButton > button[kind="primary"]:hover {
-  background: #B8952E !important;
-  border-color: #B8952E !important;
+  background: #B89022 !important;
+  border-color: var(--ochre-gold) !important;
 }
 [data-testid="stVerticalBlockBorderWrapper"]:has(.agent-card-marker) .stButton > button[kind="secondary"] {
-  background: #27272A !important;
-  border-color: #3F3F46 !important;
-  color: #FAF9F6 !important;
+  background: var(--panel-obsidian-elevated) !important;
+  border-color: rgba(255,255,255,0.1) !important;
+  color: var(--white) !important;
 }
 [data-testid="stVerticalBlockBorderWrapper"]:has(.agent-card-marker) .stButton > button[kind="secondary"]:hover {
-  border-color: #D4AF37 !important;
-  color: #18181B !important;
-  background: #D4AF37 !important;
+  border-color: var(--ochre-border) !important;
+  color: var(--panel-obsidian) !important;
+  background: var(--ochre-gold) !important;
+}
+
+/* Agent Fleet Inputs in Dark Cards */
+[data-testid="stVerticalBlockBorderWrapper"]:has(.agent-card-marker) .stNumberInput > div > div > input,
+[data-testid="stVerticalBlockBorderWrapper"]:has(.agent-card-marker) .stTextInput > div > div > input,
+[data-testid="stVerticalBlockBorderWrapper"]:has(.agent-card-marker) .stSelectbox > div > div,
+[data-testid="stVerticalBlockBorderWrapper"]:has(.agent-card-marker) .stTextArea > div > div > textarea {
+  background: var(--panel-obsidian-elevated) !important;
+  border: 1px solid rgba(255,255,255,0.12) !important;
+  color: var(--white) !important;
+  border-radius: var(--radius-md) !important;
+}
+[data-testid="stVerticalBlockBorderWrapper"]:has(.agent-card-marker) .stNumberInput > div > div > input:focus,
+[data-testid="stVerticalBlockBorderWrapper"]:has(.agent-card-marker) .stTextInput > div > div > input:focus,
+[data-testid="stVerticalBlockBorderWrapper"]:has(.agent-card-marker) .stSelectbox > div > div:focus-within {
+  border-color: var(--ochre-gold) !important;
+  box-shadow: var(--shadow-gold) !important;
 }
 
 /* Login Card Dark */
 [data-testid="stVerticalBlockBorderWrapper"]:has(.login-marker) {
-  background: #18181B !important;
-  border: 1px solid #2A2E37 !important;
-  border-radius: 16px !important;
-  padding: 2rem 1.5rem !important;
-  color: #FAF9F6 !important;
-  box-shadow: 0 8px 32px rgba(0,0,0,0.4) !important;
+  background: var(--panel-obsidian) !important;
+  border: 1px solid var(--panel-border) !important;
+  border-radius: var(--radius-xl) !important;
+  padding: 2.5rem 2rem !important;
+  color: var(--white) !important;
+  box-shadow: var(--shadow-inner), 0 20px 60px -20px rgba(0,0,0,0.45) !important;
 }
 [data-testid="stVerticalBlockBorderWrapper"]:has(.login-marker) * {
-  color: #FAF9F6 !important;
+  color: var(--white) !important;
 }
 [data-testid="stVerticalBlockBorderWrapper"]:has(.login-marker) h1,
 [data-testid="stVerticalBlockBorderWrapper"]:has(.login-marker) h2,
@@ -441,232 +964,379 @@ h3 { font-size: 1.1rem !important; color: var(--panel-dark) !important; margin-b
 [data-testid="stVerticalBlockBorderWrapper"]:has(.login-marker) h4,
 [data-testid="stVerticalBlockBorderWrapper"]:has(.login-marker) p,
 [data-testid="stVerticalBlockWrapper"]:has(.login-marker) label {
-  color: #FAF9F6 !important;
+  color: var(--white) !important;
 }
 [data-testid="stVerticalBlockBorderWrapper"]:has(.login-marker) .stTextInput > div > div > input {
-  background: #27272A !important;
-  border: 1px solid #3F3F46 !important;
-  color: #FAF9F6 !important;
-  border-radius: 10px !important;
+  background: var(--panel-obsidian-elevated) !important;
+  border: 1px solid rgba(255,255,255,0.12) !important;
+  color: var(--white) !important;
+  border-radius: var(--radius-md) !important;
+}
+[data-testid="stVerticalBlockBorderWrapper"]:has(.login-marker) .stTextInput > div > div > input:focus {
+  border-color: var(--ochre-gold) !important;
+  box-shadow: var(--shadow-gold) !important;
 }
 [data-testid="stVerticalBlockBorderWrapper"]:has(.login-marker) .stFormSubmitButton > button {
-  background: #D4AF37 !important;
-  border-color: #D4AF37 !important;
-  color: #18181B !important;
-  border-radius: 10px !important;
+  background: var(--ochre-gold) !important;
+  border-color: var(--ochre-gold) !important;
+  color: var(--panel-obsidian) !important;
+  border-radius: var(--radius-md) !important;
   font-weight: 700 !important;
+  padding: 0.875rem 2rem !important;
+  font-size: 1rem !important;
+  letter-spacing: 0.02em !important;
 }
 [data-testid="stVerticalBlockBorderWrapper"]:has(.login-marker) .stFormSubmitButton > button:hover {
-  background: #B8952E !important;
-  border-color: #B8952E !important;
+  background: #B89022 !important;
+  border-color: var(--ochre-gold) !important;
 }
 
-/* KPI Cards — Dark Charcoal with Gold/Ivory */
+/* ============================================================
+   KPI METRIC CARDS — Dark Charcoal with Gold/Ivory
+============================================================ */
 .kpi-card {
-  background: #18181B !important;
-  border: 1px solid #2A2A2E !important;
-  border-radius: 14px !important;
-  padding: 1.1rem 1.25rem !important;
+  background: var(--panel-obsidian) !important;
+  border: 1px solid var(--panel-border) !important;
+  border-radius: var(--radius-lg) !important;
+  padding: 1.35rem 1.5rem !important;
   text-align: center !important;
   color: var(--white) !important;
-  box-shadow: 0 4px 16px rgba(0,0,0,0.35) !important;
-  transition: all 0.22s cubic-bezier(0.4, 0, 0.2, 1) !important;
+  box-shadow: var(--shadow-inner), var(--shadow-lg) !important;
+  transition: all var(--duration-normal) var(--ease-smooth) !important;
 }
-.kpi-card:hover { border-color: var(--ochre) !important; transform: translateY(-2px) !important; }
-.kpi-card .value { font-size: 1.85rem !important; font-weight: 700 !important; color: var(--white) !important; display: block !important; margin-bottom: 0.25rem !important; line-height: 1.1 !important; }
-.kpi-card .label { font-size: 0.7rem !important; text-transform: uppercase !important; letter-spacing: 0.08em !important; color: #A8A296 !important; display: block !important; }
-.kpi-card .sub { font-size: 0.75rem !important; color: var(--ochre) !important; font-weight: 600 !important; display: block !important; margin-top: 0.35rem !important; }
+.kpi-card:hover { 
+  border-color: var(--ochre-border) !important; 
+  transform: translateY(-2px) !important; 
+  box-shadow: var(--shadow-inner), 0 16px 48px -16px rgba(212, 175, 55, 0.15) !important;
+}
+.kpi-card .value { 
+  font-family: 'JetBrains Mono', monospace !important;
+  font-variant-numeric: tabular-nums !important;
+  font-size: clamp(1.75rem, 3vw, 2.1rem) !important; 
+  font-weight: 700 !important; 
+  color: var(--ochre-gold) !important; 
+  display: block !important; 
+  margin-bottom: 0.25rem !important; 
+  line-height: 1.1 !important; 
+  letter-spacing: -0.02em !important;
+}
+.kpi-card .label { 
+  font-family: 'Plus Jakarta Sans', sans-serif !important;
+  font-size: 0.68rem !important; 
+  text-transform: uppercase !important; 
+  letter-spacing: 0.1em !important; 
+  color: var(--silver) !important; 
+  display: block !important; 
+  font-weight: 600 !important; 
+}
+.kpi-card .sub { 
+  font-family: 'Plus Jakarta Sans', sans-serif !important;
+  font-size: 0.72rem !important; 
+  color: var(--ochre-gold) !important; 
+  font-weight: 600 !important; 
+  display: block !important; 
+  margin-top: 0.5rem !important; 
+}
 
-/* Pipeline Stepper */
+/* ============================================================
+   PIPELINE STEPPER — Refined Horizontal Progress Track
+============================================================ */
 .pipeline-stepper {
   display: flex !important;
-  gap: 0.5rem !important;
-  padding: 1rem !important;
-  background: #18181B !important;
-  border: 1px solid #2A2E37 !important;
-  border-radius: 14px !important;
+  gap: 0 !important;
+  padding: 1.25rem 1.5rem !important;
+  background: var(--panel-obsidian) !important;
+  border: 1px solid var(--panel-border) !important;
+  border-radius: var(--radius-lg) !important;
   overflow-x: auto !important;
+  position: relative !important;
+}
+.pipeline-stepper::before {
+  content: '' !important;
+  position: absolute !important;
+  top: 50% !important;
+  left: 3.5rem !important;
+  right: 3.5rem !important;
+  height: 2px !important;
+  background: linear-gradient(90deg, var(--panel-border) 0%, var(--ochre-border) 50%, var(--panel-border) 100%) !important;
+  transform: translateY(-50%) !important;
+  z-index: 0 !important;
 }
 .pipeline-step {
   flex: 1 !important;
-  min-width: 120px !important;
+  min-width: 110px !important;
   text-align: center !important;
   padding: 0.75rem 0.5rem !important;
   position: relative !important;
-}
-.pipeline-step:not(:last-child)::after {
-  content: "→" !important;
-  position: absolute !important;
-  right: -0.75rem !important;
-  top: 50% !important;
-  transform: translateY(-50%) !important;
-  color: #D4AF37 !important;
-  font-weight: 700 !important;
+  z-index: 1 !important;
 }
 .pipeline-dot {
-  width: 14px !important; height: 14px !important; border-radius: 50% !important;
-  margin: 0 auto 0.5rem !important; border: 2px solid #3F3F46 !important;
-  background: #18181B !important; transition: all 0.22s ease !important;
+  width: 14px !important; 
+  height: 14px !important; 
+  border-radius: 50% !important;
+  margin: 0 auto 0.5rem !important; 
+  border: 2px solid rgba(255,255,255,0.12) !important;
+  background: var(--panel-obsidian) !important; 
+  transition: all var(--duration-normal) var(--ease-smooth) !important;
+  position: relative !important;
+  box-shadow: 0 0 0 4px var(--panel-obsidian) !important;
 }
-.pipeline-step.armed .pipeline-dot { background: #10B981 !important; border-color: #10B981 !important; box-shadow: 0 0 8px #10B981 !important; }
-.pipeline-step.queued .pipeline-dot { background: #D4AF37 !important; border-color: #D4AF37 !important; box-shadow: 0 0 8px #D4AF37 !important; }
-.pipeline-step.standby .pipeline-dot { background: #18181B !important; border-color: #3F3F46 !important; }
-.pipeline-label { font-size: 0.7rem !important; text-transform: uppercase !important; letter-spacing: 0.06em !important; color: #A1A1AA !important; font-weight: 600 !important; }
-.pipeline-step.armed .pipeline-label { color: #10B981 !important; }
-.pipeline-step.queued .pipeline-label { color: #D4AF37 !important; }
+.pipeline-step.armed .pipeline-dot { 
+  background: var(--emerald) !important; 
+  border-color: var(--emerald) !important; 
+  box-shadow: 0 0 0 4px var(--panel-obsidian), 0 0 12px var(--emerald-glow) !important; 
+}
+.pipeline-step.queued .pipeline-dot { 
+  background: var(--ochre-gold) !important; 
+  border-color: var(--ochre-gold) !important; 
+  box-shadow: 0 0 0 4px var(--panel-obsidian), 0 0 12px var(--ochre-wash) !important; 
+}
+.pipeline-step.standby .pipeline-dot { 
+  background: var(--panel-obsidian) !important; 
+  border-color: rgba(255,255,255,0.12) !important; 
+}
+.pipeline-label { 
+  font-family: 'Plus Jakarta Sans', sans-serif !important;
+  font-size: 0.68rem !important; 
+  text-transform: uppercase !important; 
+  letter-spacing: 0.08em !important; 
+  color: var(--silver-dim) !important; 
+  font-weight: 600 !important; 
+  white-space: nowrap !important;
+}
+.pipeline-step.armed .pipeline-label { color: var(--emerald) !important; font-weight: 700 !important; }
+.pipeline-step.queued .pipeline-label { color: var(--ochre-gold) !important; font-weight: 700 !important; }
+.pipeline-step.standby .pipeline-label { color: var(--silver-dim) !important; }
 
-/* Status badges */
+/* ============================================================
+   STATUS BADGES — Refined Editorial Style
+============================================================ */
 .tag {
-  display: inline-block !important;
-  padding: 0.15rem 0.55rem !important;
-  border-radius: 6px !important;
-  font-size: 0.68rem !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  padding: 0.175rem 0.625rem !important;
+  border-radius: var(--radius-pill) !important;
+  font-family: 'Plus Jakarta Sans', sans-serif !important;
+  font-size: 0.65rem !important;
   font-weight: 600 !important;
   text-transform: uppercase !important;
-  letter-spacing: 0.05em !important;
+  letter-spacing: 0.06em !important;
   margin-right: 0.35rem !important;
+  margin-bottom: 0.25rem !important;
 }
-.tag-draft { background: #F3EFE6 !important; color: #8A7F6F !important; border: 1px solid #D9D0C0 !important; }
-.tag-needs_review { background: #FFF8E1 !important; color: #B88A1A !important; border: 1px solid #E8D49A !important; }
-.tag-approved { background: #EAF3EC !important; color: var(--forest) !important; border: 1px solid #C9D6C2 !important; }
-.tag-rejected { background: #FBEEE9 !important; color: #8A5A4A !important; border: 1px solid #DFC8C2 !important; }
-.tag-failed { background: #F3EFE6 !important; color: var(--muted) !important; border: 1px solid #D9D0C0 !important; }
-.tag-armed { background: #E8F5E9 !important; color: var(--forest) !important; border: 1px solid #C8E6C9 !important; }
-.tag-standby { background: #F3EFE6 !important; color: var(--muted) !important; border: 1px solid #D9D0C0 !important; }
-.tag-queued { background: #FFF8E1 !important; color: #B88A1A !important; border: 1px solid #E8D49A !important; }
-.tag-done { background: #EAF3EC !important; color: var(--forest) !important; border: 1px solid #C9D6C2 !important; }
+.tag-draft { background: rgba(212, 175, 55, 0.12) !important; color: #B88A1A !important; border: 1px solid rgba(212, 175, 55, 0.25) !important; }
+.tag-needs_review { background: rgba(212, 175, 55, 0.12) !important; color: #C9A227 !important; border: 1px solid rgba(212, 175, 55, 0.25) !important; }
+.tag-approved { background: rgba(16, 185, 129, 0.12) !important; color: #059669 !important; border: 1px solid rgba(16, 185, 129, 0.25) !important; }
+.tag-rejected { background: rgba(239, 68, 68, 0.1) !important; color: #DC2626 !important; border: 1px solid rgba(239, 68, 68, 0.2) !important; }
+.tag-failed { background: rgba(148, 163, 184, 0.1) !important; color: #64748B !important; border: 1px solid rgba(148, 163, 184, 0.2) !important; }
+.tag-armed { background: rgba(16, 185, 129, 0.12) !important; color: #059669 !important; border: 1px solid rgba(16, 185, 129, 0.25) !important; }
+.tag-standby { background: rgba(148, 163, 184, 0.1) !important; color: #64748B !important; border: 1px solid rgba(148, 163, 184, 0.2) !important; }
+.tag-queued { background: rgba(212, 175, 55, 0.12) !important; color: #C9A227 !important; border: 1px solid rgba(212, 175, 55, 0.25) !important; }
+.tag-done { background: rgba(16, 185, 129, 0.12) !important; color: #059669 !important; border: 1px solid rgba(16, 185, 129, 0.25) !important; }
 
-/* Buttons */
+/* ============================================================
+   BUTTONS — Tactile Micro-Interactions
+============================================================ */
 .stButton > button, .stFormSubmitButton > button {
-  border-radius: 10px !important;
+  border-radius: var(--radius-md) !important;
+  font-family: 'Plus Jakarta Sans', sans-serif !important;
   font-weight: 600 !important;
-  transition: all 0.22s cubic-bezier(0.4, 0, 0.2, 1) !important;
-  border: 1px solid var(--line) !important;
+  font-size: 0.875rem !important;
+  letter-spacing: 0.01em !important;
+  transition: all var(--duration-normal) var(--ease-smooth) !important;
+  border: 1px solid var(--card-border) !important;
   background: #FFFFFF !important;
   color: var(--ink) !important;
-  padding: 0.55rem 1.2rem !important;
-  font-family: "Inter", sans-serif !important;
+  padding: 0.625rem 1.375rem !important;
 }
 .stButton > button:hover, .stFormSubmitButton > button:hover {
-  border-color: var(--ochre) !important;
-  color: #1F1A17 !important;
-  background: #FFF9F0 !important;
+  border-color: var(--ochre-gold) !important;
+  color: var(--ink) !important;
+  background: #FEFEF8 !important;
+  transform: translateY(-1px) !important;
+  box-shadow: var(--shadow-sm) !important;
+}
+.stButton > button:active, .stFormSubmitButton > button:active {
+  transform: translateY(0) !important;
 }
 .stButton > button[kind="primary"], .stFormSubmitButton > button[kind="primary"] {
-  background: #18181B !important;
-  border-color: #18181B !important;
+  background: var(--panel-obsidian) !important;
+  border-color: var(--ochre-border) !important;
   color: var(--white) !important;
+  box-shadow: 0 0 0 1px var(--ochre-border) inset !important;
 }
 .stButton > button[kind="primary"]:hover, .stFormSubmitButton > button[kind="primary"]:hover {
-  background: var(--ochre) !important;
-  border-color: var(--ochre) !important;
-  color: #18181B !important;
+  background: var(--panel-obsidian-elevated) !important;
+  border-color: var(--ochre-gold) !important;
+  color: var(--white) !important;
+  box-shadow: 0 4px 20px rgba(212, 175, 55, 0.25) !important;
+}
+.stButton > button[kind="secondary"] {
+  background: var(--card-porcelain) !important;
+  border-color: var(--card-border) !important;
+  color: var(--ink) !important;
+}
+.stButton > button[kind="secondary"]:hover {
+  background: #F3EFE6 !important;
+  border-color: var(--ochre-border) !important;
+  color: var(--ink) !important;
 }
 
-/* Inputs */
+/* ============================================================
+   INPUTS — Clean, Consistent, High-Contrast
+============================================================ */
 .stTextInput > div > div > input,
 .stTextArea > div > div > textarea,
 .stSelectbox > div > div,
 .stNumberInput > div > div > input {
   background: #FFFFFF !important;
-  border: 1px solid var(--line) !important;
-  border-radius: 10px !important;
+  border: 1px solid var(--card-border) !important;
+  border-radius: var(--radius-md) !important;
   color: var(--ink) !important;
+  font-family: 'Plus Jakarta Sans', sans-serif !important;
+  font-size: 0.9rem !important;
+  padding: 0.625rem 0.875rem !important;
+  transition: all var(--duration-fast) var(--ease-smooth) !important;
 }
-.stToggle > label { color: var(--ink) !important; }
-
-/* Dataframes */
-[data-testid="stDataFrame"] {
-  border: 1px solid var(--line) !important;
-  border-radius: 12px !important;
-  overflow: hidden !important;
+.stTextInput > div > div > input:focus,
+.stTextArea > div > div > textarea:focus,
+.stSelectbox > div > div:focus-within,
+.stNumberInput > div > div > input:focus {
+  border-color: var(--ochre-gold) !important;
+  box-shadow: var(--shadow-gold) !important;
+  outline: none !important;
 }
-
-/* Dark card self-contained HTML (fallback) */
-.dark-card {
-  background: #18181B !important;
-  border: 1px solid #2A2A2E !important;
-  border-radius: 14px !important;
-  padding: 1.25rem !important;
-  color: var(--white) !important;
-  box-shadow: 0 4px 16px rgba(0,0,0,0.35) !important;
-}
-.dark-card h3, .dark-card h4 { color: var(--ochre) !important; margin-top: 0 !important; margin-bottom: 0.5rem !important; }
-.dark-card .muted { color: #A8A296 !important; font-size: 0.85rem !important; }
-.dark-card .accent { color: var(--ochre) !important; font-weight: 600 !important; }
-
-/* Output cards (light) */
-.output-card {
+.stSelectbox > div > div {
   background: #FFFFFF !important;
-  border: 1px solid var(--line) !important;
-  border-radius: 14px !important;
-  padding: 1.25rem !important;
-  margin-bottom: 1rem !important;
-  transition: all 0.22s cubic-bezier(0.4, 0, 0.2, 1) !important;
+  border: 1px solid var(--card-border) !important;
+  border-radius: var(--radius-md) !important;
 }
-.output-card:hover { border-color: var(--ochre) !important; box-shadow: var(--card-shadow-hover) !important; }
-
-/* Meta row */
-.meta-row {
-  font-size: 0.7rem !important;
-  color: var(--muted) !important;
-  text-transform: uppercase !important;
-  letter-spacing: 0.06em !important;
-  margin-bottom: 0.6rem !important;
-  border-bottom: 1px solid #EFE9DE !important;
-  padding-bottom: 0.5rem !important;
+.stTextArea > div > div > textarea {
+  min-height: 100px !important;
+  resize: vertical !important;
+  line-height: 1.6 !important;
+  font-family: 'Plus Jakarta Sans', sans-serif !important;
+}
+.stToggle > label { 
+  color: var(--ink) !important; 
+  font-family: 'Plus Jakarta Sans', sans-serif !important;
+  font-weight: 500 !important;
 }
 
-/* Log lines */
-.log-line { font-family: "Menlo", "Monaco", monospace !important; font-size: 0.75rem !important; padding: 0.25rem 0.5rem !important; border-bottom: 1px solid #2A2A2E !important; color: #D8CFC0 !important; }
-.log-line.ok { color: var(--forest) !important; }
-.log-line.err { color: #C99A7A !important; }
-.log-line.inf { color: var(--sage) !important; }
-
-/* Connection pill */
-.conn-pill {
-  display: inline-flex; align-items: center; gap: 0.4rem;
-  padding: 0.35rem 0.85rem; border-radius: 999px;
-  font-size: 0.7rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em;
+/* Dark Card Inputs — Seamless blending */
+[data-testid="stVerticalBlockBorderWrapper"]:has(.agent-card-marker) .stNumberInput > div > div > input,
+[data-testid="stVerticalBlockBorderWrapper"]:has(.agent-card-marker) .stTextInput > div > div > input,
+[data-testid="stVerticalBlockBorderWrapper"]:has(.agent-card-marker) .stSelectbox > div > div,
+[data-testid="stVerticalBlockBorderWrapper"]:has(.agent-card-marker) .stTextArea > div > div > textarea,
+[data-testid="stVerticalBlockBorderWrapper"]:has(.login-marker) .stTextInput > div > div > input {
+  background: var(--panel-obsidian-elevated) !important;
+  border: 1px solid rgba(255,255,255,0.12) !important;
+  color: var(--white) !important;
+  border-radius: var(--radius-md) !important;
 }
-.conn-ok { background: #E8F5E9; color: var(--forest); border: 1px solid #C8E6C9; }
-.conn-warn { background: #FFF8E1; color: #B88A1A; border: 1px solid #E8D49A; }
-
-/* Progress bar */
-.stProgress > div > div > div { background: var(--ochre) !important; }
+[data-testid="stVerticalBlockBorderWrapper"]:has(.agent-card-marker) .stNumberInput > div > div > input:focus,
+[data-testid="stVerticalBlockBorderWrapper"]:has(.agent-card-marker) .stTextInput > div > div > input:focus,
+[data-testid="stVerticalBlockBorderWrapper"]:has(.agent-card-marker) .stSelectbox > div > div:focus-within,
+[data-testid="stVerticalBlockBorderWrapper"]:has(.login-marker) .stTextInput > div > div > input:focus {
+  border-color: var(--ochre-gold) !important;
+  box-shadow: var(--shadow-gold) !important;
+}
 
 /* ============================================================
-   SIDEBAR TOGGLE BUTTON — Keep visible (Fix 2)
+   DATAFRAMES — Clean Tables
+============================================================ */
+[data-testid="stDataFrame"] {
+  border: 1px solid var(--card-border) !important;
+  border-radius: var(--radius-lg) !important;
+  overflow: hidden !important;
+  background: var(--card-porcelain) !important;
+}
+
+/* ============================================================
+   LOG LINES — Monospace Terminal Style
+============================================================ */
+.log-line { 
+  font-family: 'JetBrains Mono', 'Fira Code', 'Monaco', 'Menlo', monospace !important; 
+  font-variant-numeric: tabular-nums !important;
+  font-size: 0.725rem !important; 
+  padding: 0.25rem 0.625rem !important; 
+  border-bottom: 1px solid rgba(255,255,255,0.04) !important; 
+  color: #C0C0C8 !important; 
+  line-height: 1.5 !important;
+}
+.log-line.ok { color: var(--emerald) !important; }
+.log-line.err { color: #EF4444 !important; }
+.log-line.inf { color: var(--ochre-gold) !important; }
+
+/* ============================================================
+   SIDEBAR TOGGLE BUTTON — Visible & Bespoke
 ============================================================ */
 header[data-testid="stHeader"] {
   background: transparent !important;
-  height: 3.2rem !important;
+  height: 3.4rem !important;
 }
 [data-testid="stSidebarCollapseButton"],
 [data-testid="collapsedControl"],
 button[kind="header"] {
-  background: #18181B !important;
-  color: #D4AF37 !important;
-  border: 1px solid rgba(212,175,55,0.45) !important;
-  border-radius: 8px !important;
-  padding: 0.35rem 0.6rem !important;
-  font-size: 1.1rem !important;
+  background: var(--panel-obsidian) !important;
+  color: var(--ochre-gold) !important;
+  border: 1px solid var(--ochre-border) !important;
+  border-radius: var(--radius-md) !important;
+  padding: 0.4rem 0.7rem !important;
+  font-size: 1.15rem !important;
   display: flex !important;
   align-items: center !important;
   justify-content: center !important;
   opacity: 1 !important;
   visibility: visible !important;
+  transition: all var(--duration-fast) var(--ease-smooth) !important;
 }
 [data-testid="stSidebarCollapseButton"]:hover,
 [data-testid="collapsedControl"]:hover {
-  background: #D4AF37 !important;
-  color: #18181B !important;
-  border-color: #D4AF37 !important;
+  background: var(--ochre-gold) !important;
+  color: var(--panel-obsidian) !important;
+  border-color: var(--ochre-gold) !important;
 }
 
-/* Hide Streamlit chrome (but keep header for sidebar toggle) */
-#MainMenu {visibility: hidden;}
-footer {visibility: hidden;}
+/* ============================================================
+   CONNECTION PILL & META ROW
+============================================================ */
+.conn-pill {
+  display: inline-flex !important;
+  align-items: center !important;
+  gap: 0.5rem !important;
+  padding: 0.4rem 1rem !important;
+  border-radius: var(--radius-pill) !important;
+  font-family: 'Plus Jakarta Sans', sans-serif !important;
+  font-size: 0.68rem !important;
+  font-weight: 600 !important;
+  text-transform: uppercase !important;
+  letter-spacing: 0.08em !important;
+}
+.conn-ok { background: rgba(16, 185, 129, 0.15) !important; color: var(--emerald) !important; border: 1px solid rgba(16, 185, 129, 0.3) !important; }
+.conn-warn { background: var(--ochre-wash) !important; color: var(--ochre-gold) !important; border: 1px solid var(--ochre-border) !important; }
+
+.meta-row {
+  font-family: 'Plus Jakarta Sans', sans-serif !important;
+  font-size: 0.68rem !important;
+  color: var(--muted) !important;
+  text-transform: uppercase !important;
+  letter-spacing: 0.08em !important;
+  margin-bottom: 0.75rem !important;
+  border-bottom: 1px solid #EFE9DE !important;
+  padding-bottom: 0.625rem !important;
+}
+
+/* Progress bar */
+.stProgress > div > div > div { background: var(--ochre-gold) !important; }
+
+/* ============================================================
+   HIDE STREAMLIT CHROME (keep sidebar toggle)
+============================================================ */
+#MainMenu {visibility: hidden !important;}
+footer {visibility: hidden !important;}
+[data-testid="stDeployButton"] {visibility: hidden !important;}
+[data-testid="stToolbar"] {visibility: hidden !important;}
 </style>
 """
 
