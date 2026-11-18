@@ -51,7 +51,7 @@ st.set_page_config(
     page_title="Rishi-OS",
     page_icon="⚡",
     layout="wide",
-    initial_sidebar_state="expanded",
+    initial_sidebar_state="collapsed",
 )
 
 # ---------------------------------------------------------------------------
@@ -247,6 +247,12 @@ if not st.session_state.local_state.get("brands"):
 _save_local_state(st.session_state.local_state)
 
 # ---------------------------------------------------------------------------
+# Default Agent Fleet (7 built-in agents) — Always available, never empty
+# ---------------------------------------------------------------------------
+DEFAULT_AGENTS_LIST = DEFAULT_AGENTS  # alias for compatibility
+DEFAULT_BRANDS_LIST = [b["key"] for b in DEFAULT_BRANDS]
+
+# ---------------------------------------------------------------------------
 # Design System CSS — Bespoke $10K Executive SaaS Aesthetic (Linear/Arc/Luxury Editorial)
 # ---------------------------------------------------------------------------
 _CSS = """
@@ -329,7 +335,7 @@ _CSS = """
 /* Global Font Loading & Smoothing */
 html, body, [data-testid="stAppViewContainer"] {
   background: var(--bg-warm) !important;
-  background-image: radial-gradient(circle at top right, #FAF8F3 0%, #F4F0E8 100%) !important;
+  background-image: radial-gradient(ellipse 80% 50% at 100% 0%, #FAF8F3 0%, #F4F0E8 60%, #F6F3EC 100%) !important;
   color: var(--ink) !important;
   font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif !important;
   -webkit-font-smoothing: antialiased !important;
@@ -339,13 +345,13 @@ html, body, [data-testid="stAppViewContainer"] {
 
 [data-testid="stMainBlockContainer"] {
   background: transparent !important;
-  padding-top: 1.5rem !important;
-  max-width: 1560px !important;
-  animation: fadeIn 0.5s var(--ease-smooth) forwards !important;
+  padding-top: 0 !important;
+  max-width: 1600px !important;
+  animation: fadeIn 0.55s var(--ease-smooth) forwards !important;
 }
 
 @keyframes fadeIn {
-  from { opacity: 0; transform: translateY(6px); }
+  from { opacity: 0; transform: translateY(8px); }
   to { opacity: 1; transform: translateY(0); }
 }
 
@@ -358,190 +364,6 @@ h1, h2, h3, h4, h5, h6 {
 }
 
 h1 { 
-  font-size: clamp(1.75rem, 3vw, 2.25rem) !important; 
-  font-weight: 600 !important;
-  letter-spacing: -0.03em !important;
-  margin-bottom: 0.375rem !important; 
-}
-h1 + .stMarkdown > p:first-child,
-h1 + .stCaption {
-  font-family: 'Plus Jakarta Sans', sans-serif !important;
-  font-size: 0.95rem !important;
-  color: var(--muted) !important;
-  font-weight: 400 !important;
-  margin-top: -0.25rem !important;
-  margin-bottom: 1.5rem !important;
-  line-height: 1.5 !important;
-}
-
-h2 { 
-  font-size: clamp(1.25rem, 2vw, 1.5rem) !important; 
-  font-weight: 500 !important; 
-  color: var(--ink) !important; 
-  margin-top: 2rem !important; 
-  margin-bottom: 1rem !important; 
-}
-
-h3 { 
-  font-size: 1.05rem !important; 
-  font-weight: 500 !important; 
-  color: var(--ink) !important; 
-  margin-bottom: 0.625rem !important; 
-}
-
-/* Global UI Font */
-[data-testid="stSidebar"] *,
-.stButton > button,
-.stFormSubmitButton > button,
-.stSelectbox, .stTextInput, .stTextArea, .stNumberInput,
-.stToggle, .stCheckbox, .stRadio,
-.stMarkdown, .stCaption, .stAlert,
-[data-testid="stDataFrame"] {
-  font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif !important;
-}
-
-/* Monospace for Technical Data */
-code, kbd, samp,
-[data-testid="stCodeBlock"],
-.stCodeBlock,
-.log-line,
-.stMarkdown code,
-.stNumberInput input,
-.stTextInput input[type="text"],
-[data-testid="stMetricValue"],
-[data-testid="stMetricLabel"],
-.stMetric [data-testid="stMetricValue"],
-.stMetric [data-testid="stMetricLabel"] {
-  font-family: 'JetBrains Mono', 'Fira Code', 'Monaco', 'Menlo', monospace !important;
-  font-variant-numeric: tabular-nums !important;
-  font-feature-settings: "tnum" "liga" "calt" !important;
-}
-
-/* ============================================================
-   GLOBAL CANVAS & AMBIENT BACKGROUND
-============================================================ */
-html, body, [data-testid="stAppViewContainer"] {
-  background: var(--bg-warm) !important;
-  background-image: radial-gradient(ellipse 80% 50% at 100% 0%, #FAF8F3 0%, #F4F0E8 60%, #F6F3EC 100%) !important;
-  color: var(--ink) !important;
-  font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, sans-serif !important;
-  -webkit-font-smoothing: antialiased !important;
-  -moz-osx-font-smoothing: grayscale !important;
-}
-
-[data-testid="stMainBlockContainer"] {
-  background: transparent !important;
-  padding-top: 1.75rem !important;
-  max-width: 1580px !important;
-  animation: fadeIn 0.55s var(--ease-smooth) forwards !important;
-}
-
-@keyframes fadeIn {
-  from { opacity: 0; transform: translateY(8px); }
-  to { opacity: 1; transform: translateY(0); }
-}
-
-/* ============================================================
-   SIDEBAR — Obsidian Charcoal with Gold Accents
-============================================================ */
-[data-testid="stSidebar"] {
-  background: var(--panel-obsidian) !important;
-  border-right: 1px solid var(--panel-border) !important;
-  width: 290px !important;
-  min-width: 290px !important;
-  box-shadow: var(--shadow-xl) !important;
-}
-
-[data-testid="stSidebar"] * {
-  color: var(--white) !important;
-  font-family: 'Plus Jakarta Sans', sans-serif !important;
-}
-
-[data-testid="stSidebar"] .stButton > button {
-  background: transparent !important;
-  border: 1px solid rgba(255,255,255,0.08) !important;
-  color: var(--white) !important;
-  border-radius: var(--radius-md) !important;
-  padding: 0.7rem 1.1rem !important;
-  width: 100% !important;
-  text-align: left !important;
-  font-size: 0.875rem !important;
-  font-weight: 500 !important;
-  letter-spacing: 0.01em !important;
-  transition: all var(--duration-normal) var(--ease-smooth) !important;
-  margin-bottom: 0.3rem !important;
-  background: transparent !important;
-}
-
-[data-testid="stSidebar"] .stButton > button:hover {
-  background: var(--ochre-gold) !important;
-  border-color: var(--ochre-gold) !important;
-  color: var(--panel-obsidian) !important;
-  transform: translateX(4px) !important;
-  box-shadow: 0 4px 20px rgba(212, 175, 55, 0.25) !important;
-}
-
-[data-testid="stSidebar"] .stButton > button[kind="primary"] {
-  background: var(--ochre-gold) !important;
-  border-color: var(--ochre-gold) !important;
-  color: var(--panel-obsidian) !important;
-  font-weight: 600 !important;
-}
-
-[data-testid="stSidebar"] .stButton > button[kind="primary"]:hover {
-  background: #B89022 !important;
-  border-color: #C9A227 !important;
-}
-
-/* Sidebar Navigation Pills — Bespoke */
-[data-testid="stSidebar"] .stButton > button[data-testid^="nav_"] {
-  display: flex !important;
-  align-items: center !important;
-  gap: 0.75rem !important;
-  padding: 0.85rem 1.25rem !important;
-  border-radius: var(--radius-lg) !important;
-  background: transparent !important;
-  border: 1px solid transparent !important;
-  margin-bottom: 0.35rem !important;
-  position: relative !important;
-}
-
-[data-testid="stSidebar"] .stButton > button[data-testid^="nav_"]:hover {
-  background: rgba(255,255,255,0.04) !important;
-  border-color: rgba(255,255,255,0.08) !important;
-  transform: none !important;
-  box-shadow: none !important;
-}
-
-[data-testid="stSidebar"] .stButton > button[data-testid^="nav_"][kind="primary"] {
-  background: rgba(212, 175, 55, 0.1) !important;
-  border-color: var(--ochre-border) !important;
-  background-image: linear-gradient(90deg, var(--ochre-wash) 0%, transparent 100%) !important;
-}
-
-[data-testid="stSidebar"] .stButton > button[data-testid^="nav_"][kind="primary"]::before {
-  content: '' !important;
-  position: absolute !important;
-  left: 0 !important;
-  top: 50% !important;
-  transform: translateY(-50%) !important;
-  width: 3px !important;
-  height: 60% !important;
-  background: var(--ochre-gold) !important;
-  border-radius: 0 var(--radius-md) var(--radius-md) 0 !important;
-}
-
-/* ============================================================
-   MAIN CANVAS TYPOGRAPHY
-============================================================ */
-h1, h2, h3, h4, h5, h6 {
-  font-family: 'Instrument Serif', Georgia, 'Iowan Old Style', serif !important;
-  color: var(--ink) !important;
-  letter-spacing: -0.02em !important;
-  line-height: 1.15 !important;
-}
-
-h1 { 
   font-size: clamp(1.85rem, 3vw, 2.35rem) !important; 
   font-weight: 600 !important;
   letter-spacing: -0.03em !important;
@@ -614,150 +436,8 @@ html, body, [data-testid="stAppViewContainer"] {
 
 [data-testid="stMainBlockContainer"] {
   background: transparent !important;
-  padding-top: 1.75rem !important;
-  max-width: 1580px !important;
-  animation: fadeIn 0.55s var(--ease-smooth) forwards !important;
-}
-
-/* ============================================================
-   SIDEBAR — Obsidian Charcoal with Gold Accents
-============================================================ */
-[data-testid="stSidebar"] {
-  background: var(--panel-obsidian) !important;
-  border-right: 1px solid var(--panel-border) !important;
-  width: 290px !important;
-  min-width: 290px !important;
-  box-shadow: var(--shadow-xl) !important;
-}
-
-[data-testid="stSidebar"] * {
-  color: var(--white) !important;
-  font-family: 'Plus Jakarta Sans', sans-serif !important;
-}
-
-/* Sidebar Navigation Pills — Bespoke */
-[data-testid="stSidebar"] .stButton > button[data-testid^="nav_"] {
-  display: flex !important;
-  align-items: center !important;
-  gap: 0.75rem !important;
-  padding: 0.85rem 1.25rem !important;
-  border-radius: var(--radius-lg) !important;
-  background: transparent !important;
-  border: 1px solid transparent !important;
-  margin-bottom: 0.35rem !important;
-  position: relative !important;
-}
-
-[data-testid="stSidebar"] .stButton > button[data-testid^="nav_"]:hover {
-  background: rgba(255,255,255,0.04) !important;
-  border-color: rgba(255,255,255,0.08) !important;
-  transform: none !important;
-  box-shadow: none !important;
-}
-
-[data-testid="stSidebar"] .stButton > button[data-testid^="nav_"][kind="primary"] {
-  background: rgba(212, 175, 55, 0.1) !important;
-  border-color: var(--ochre-border) !important;
-  background-image: linear-gradient(90deg, var(--ochre-wash) 0%, transparent 100%) !important;
-}
-
-[data-testid="stSidebar"] .stButton > button[data-testid^="nav_"][kind="primary"]::before {
-  content: '' !important;
-  position: absolute !important;
-  left: 0 !important;
-  top: 50% !important;
-  transform: translateY(-50%) !important;
-  width: 3px !important;
-  height: 60% !important;
-  background: var(--ochre-gold) !important;
-  border-radius: 0 var(--radius-md) var(--radius-md) 0 !important;
-}
-
-/* ============================================================
-   MAIN CANVAS TYPOGRAPHY
-============================================================ */
-h1, h2, h3, h4, h5, h6 {
-  font-family: 'Instrument Serif', Georgia, 'Iowan Old Style', serif !important;
-  color: var(--ink) !important;
-  letter-spacing: -0.02em !important;
-  line-height: 1.15 !important;
-}
-
-h1 { 
-  font-size: clamp(1.85rem, 3vw, 2.35rem) !important; 
-  font-weight: 600 !important;
-  letter-spacing: -0.03em !important;
-  margin-bottom: 0.375rem !important; 
-}
-h1 + .stMarkdown > p:first-child,
-h1 + .stCaption {
-  font-family: 'Plus Jakarta Sans', sans-serif !important;
-  font-size: 0.95rem !important;
-  color: var(--muted) !important;
-  font-weight: 400 !important;
-  margin-top: -0.25rem !important;
-  margin-bottom: 1.75rem !important;
-  line-height: 1.6 !important;
-}
-
-h2 { 
-  font-size: clamp(1.25rem, 2vw, 1.5rem) !important; 
-  font-weight: 500 !important; 
-  color: var(--ink) !important; 
-  margin-top: 2.25rem !important; 
-  margin-bottom: 1.125rem !important; 
-}
-
-h3 { 
-  font-size: 1.05rem !important; 
-  font-weight: 500 !important; 
-  color: var(--ink) !important; 
-  margin-bottom: 0.75rem !important; 
-}
-
-/* Global UI Font */
-.stButton > button,
-.stFormSubmitButton > button,
-.stSelectbox, .stTextInput, .stTextArea, .stNumberInput,
-.stToggle, .stCheckbox, .stRadio,
-.stMarkdown, .stCaption, .stAlert,
-[data-testid="stDataFrame"] {
-  font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, sans-serif !important;
-}
-
-/* Monospace for Technical Data */
-code, kbd, samp,
-[data-testid="stCodeBlock"],
-.stCodeBlock,
-.log-line,
-.stMarkdown code,
-.stNumberInput input,
-.stTextInput input[type="text"],
-[data-testid="stMetricValue"],
-[data-testid="stMetricLabel"],
-.stMetric [data-testid="stMetricValue"],
-.stMetric [data-testid="stMetricLabel"] {
-  font-family: 'JetBrains Mono', 'Fira Code', 'Monaco', 'Menlo', monospace !important;
-  font-variant-numeric: tabular-nums !important;
-  font-feature-settings: "tnum" "liga" "calt" !important;
-}
-
-/* ============================================================
-   GLOBAL CANVAS & AMBIENT BACKGROUND
-============================================================ */
-html, body, [data-testid="stAppViewContainer"] {
-  background: var(--bg-warm) !important;
-  background-image: radial-gradient(ellipse 80% 50% at 100% 0%, #FAF8F3 0%, #F4F0E8 60%, #F6F3EC 100%) !important;
-  color: var(--ink) !important;
-  font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, sans-serif !important;
-  -webkit-font-smoothing: antialiased !important;
-  -moz-osx-font-smoothing: grayscale !important;
-}
-
-[data-testid="stMainBlockContainer"] {
-  background: transparent !important;
-  padding-top: 1.75rem !important;
-  max-width: 1580px !important;
+  padding-top: 0 !important;
+  max-width: 1600px !important;
   animation: fadeIn 0.55s var(--ease-smooth) forwards !important;
 }
 
@@ -767,109 +447,559 @@ html, body, [data-testid="stAppViewContainer"] {
 }
 
 /* ============================================================
-   SIDEBAR — Obsidian Charcoal with Gold Accents
+   REMOVE SIDEBAR COMPLETELY
 ============================================================ */
 [data-testid="stSidebar"] {
+  display: none !important;
+}
+[data-testid="stSidebar"] > div {
+  display: none !important;
+}
+[data-testid="stSidebarCollapseButton"] {
+  display: none !important;
+}
+[data-testid="collapsedControl"] {
+  display: none !important;
+}
+[data-testid="stSidebarNav"] {
+  display: none !important;
+}
+
+/* ============================================================
+   EXECUTIVE TOP NAVIGATION BAR
+============================================================ */
+.executive-top-bar {
+  position: fixed !important;
+  top: 0 !important;
+  left: 0 !important;
+  right: 0 !important;
+  height: 56px !important;
   background: var(--panel-obsidian) !important;
-  border-right: 1px solid var(--panel-border) !important;
-  width: 290px !important;
-  min-width: 290px !important;
-  box-shadow: var(--shadow-xl) !important;
-}
-
-[data-testid="stSidebar"] * {
-  color: var(--white) !important;
-  font-family: 'Plus Jakarta Sans', sans-serif !important;
-}
-
-/* Sidebar Navigation Pills — Bespoke */
-[data-testid="stSidebar"] .stButton > button[data-testid^="nav_"] {
+  border-bottom: 2px solid var(--ochre-border) !important;
+  z-index: 10000 !important;
   display: flex !important;
   align-items: center !important;
-  gap: 0.75rem !important;
-  padding: 0.85rem 1.25rem !important;
-  border-radius: var(--radius-lg) !important;
-  background: transparent !important;
-  border: 1px solid transparent !important;
-  margin-bottom: 0.35rem !important;
-  position: relative !important;
+  justify-content: space-between !important;
+  padding: 0 24px !important;
+  box-shadow: var(--shadow-inner), 0 4px 24px rgba(0,0,0,0.3) !important;
 }
 
-[data-testid="stSidebar"] .stButton > button[data-testid^="nav_"]:hover {
-  background: rgba(255,255,255,0.04) !important;
-  border-color: rgba(255,255,255,0.08) !important;
-  transform: none !important;
-  box-shadow: none !important;
+.executive-top-bar-left {
+  display: flex !important;
+  align-items: center !important;
+  gap: 16px !important;
 }
 
-[data-testid="stSidebar"] .stButton > button[data-testid^="nav_"][kind="primary"] {
-  background: rgba(212, 175, 55, 0.1) !important;
-  border-color: var(--ochre-border) !important;
-  background-image: linear-gradient(90deg, var(--ochre-wash) 0%, transparent 100%) !important;
+.executive-brand {
+  display: flex !important;
+  align-items: center !important;
+  gap: 10px !important;
 }
 
-[data-testid="stSidebar"] .stButton > button[data-testid^="nav_"][kind="primary"]::before {
-  content: '' !important;
-  position: absolute !important;
-  left: 0 !important;
-  top: 50% !important;
-  transform: translateY(-50%) !important;
-  width: 3px !important;
-  height: 60% !important;
-  background: var(--ochre-gold) !important;
-  border-radius: 0 var(--radius-md) var(--radius-md) 0 !important;
+.executive-brand-icon {
+  font-size: 28px !important;
+  line-height: 1 !important;
 }
 
-/* Sidebar Header & Status Pill */
-[data-testid="stSidebar"] > div:first-child {
-  padding: 1.75rem 1.25rem 1rem 1.25rem !important;
+.executive-brand-text {
+  font-family: 'Plus Jakarta Sans', sans-serif !important;
+  font-weight: 700 !important;
+  font-size: 1.1rem !important;
+  color: var(--white) !important;
+  letter-spacing: 0.06em !important;
+  text-transform: uppercase !important;
 }
 
-[data-testid="stSidebar"] .conn-pill {
+.executive-brand-sub {
+  font-family: 'Plus Jakarta Sans', sans-serif !important;
+  font-size: 0.62rem !important;
+  color: var(--ochre-gold) !important;
+  font-weight: 600 !important;
+  letter-spacing: 0.08em !important;
+  text-transform: uppercase !important;
+  margin-top: -4px !important;
+}
+
+.executive-top-bar-right {
+  display: flex !important;
+  align-items: center !important;
+  gap: 16px !important;
+}
+
+.executive-status-pill {
   display: inline-flex !important;
   align-items: center !important;
-  gap: 0.5rem !important;
-  padding: 0.4rem 1rem !important;
+  gap: 6px !important;
+  padding: 6px 14px !important;
   border-radius: var(--radius-pill) !important;
-  font-size: 0.7rem !important;
+  font-family: 'Plus Jakarta Sans', sans-serif !important;
+  font-size: 0.68rem !important;
   font-weight: 600 !important;
   text-transform: uppercase !important;
   letter-spacing: 0.08em !important;
-  font-family: 'Plus Jakarta Sans', sans-serif !important;
 }
 .conn-ok { background: rgba(16, 185, 129, 0.15) !important; color: var(--emerald) !important; border: 1px solid rgba(16, 185, 129, 0.3) !important; }
 .conn-warn { background: var(--ochre-wash) !important; color: var(--ochre-gold) !important; border: 1px solid var(--ochre-border) !important; }
 
-/* Providers status card */
-[data-testid="stSidebar"] > div:last-of-type > div:last-child {
-  background: var(--panel-obsidian-elevated) !important;
+.executive-nav-strip {
+  position: fixed !important;
+  top: 56px !important;
+  left: 0 !important;
+  right: 0 !important;
+  height: 56px !important;
+  background: var(--bg-warm) !important;
+  background-image: radial-gradient(ellipse 80% 50% at 100% 0%, #FAF8F3 0%, #F4F0E8 60%, #F6F3EC 100%) !important;
+  border-bottom: 1px solid var(--card-border) !important;
+  z-index: 9999 !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  padding: 0 24px !important;
+  gap: 8px !important;
+}
+
+.executive-nav-btn {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  gap: 8px !important;
+  flex: 1 !important;
+  max-width: 200px !important;
+  min-height: 40px !important;
+  padding: 0 16px !important;
+  border-radius: var(--radius-lg) !important;
+  font-family: 'Plus Jakarta Sans', sans-serif !important;
+  font-size: 0.82rem !important;
+  font-weight: 600 !important;
+  letter-spacing: 0.01em !important;
+  transition: all 180ms cubic-bezier(0.16, 1, 0.3, 1) !important;
+  border: 1px solid transparent !important;
+  cursor: pointer !important;
+  text-decoration: none !important;
+}
+
+.executive-nav-btn:focus {
+  outline: none !important;
+  box-shadow: var(--shadow-gold) !important;
+}
+
+.executive-nav-btn.active {
+  background: var(--panel-obsidian) !important;
+  color: var(--ochre-gold) !important;
+  border: 1px solid var(--ochre-border) !important;
+  box-shadow: var(--shadow-inner), 0 0 0 1px var(--ochre-border) inset !important;
+}
+
+.executive-nav-btn:not(.active) {
+  background: #FFFFFF !important;
+  color: var(--ink) !important;
+  border: 1px solid #E6E0D4 !important;
+}
+
+.executive-nav-btn:not(.active):hover {
+  background: #FEFEF8 !important;
+  border-color: var(--ochre-border) !important;
+  transform: translateY(-1px) !important;
+  box-shadow: 0 4px 16px rgba(212, 175, 55, 0.15) !important;
+}
+
+/* Adjust main container to account for fixed top bars */
+[data-testid="stMainBlockContainer"] {
+  padding-top: 128px !important;
+  max-width: 1580px !important;
+  animation: fadeIn 0.55s var(--ease-smooth) forwards !important;
+}
+
+/* ============================================================
+   GLOBAL CANVAS & AMBIENT BACKGROUND
+============================================================ */
+html, body, [data-testid="stAppViewContainer"] {
+  background: var(--bg-warm) !important;
+  background-image: radial-gradient(ellipse 80% 50% at 100% 0%, #FAF8F3 0%, #F4F0E8 60%, #F6F3EC 100%) !important;
+  color: var(--ink) !important;
+  font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, sans-serif !important;
+  -webkit-font-smoothing: antialiased !important;
+  -moz-osx-font-smoothing: grayscale !important;
+}
+
+[data-testid="stMainBlockContainer"] {
+  background: transparent !important;
+  padding-top: 128px !important;
+  max-width: 1600px !important;
+  animation: fadeIn 0.55s var(--ease-smooth) forwards !important;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+/* ============================================================
+   EDITORIAL TYPOGRAPHY HIERARCHY
+============================================================ */
+h1, h2, h3, h4, h5, h6 {
+  font-family: 'Instrument Serif', Georgia, 'Iowan Old Style', serif !important;
+  color: var(--ink) !important;
+  letter-spacing: -0.02em !important;
+  line-height: 1.15 !important;
+}
+
+h1 { 
+  font-size: clamp(1.85rem, 3vw, 2.35rem) !important; 
+  font-weight: 600 !important;
+  letter-spacing: -0.03em !important;
+  margin-bottom: 0.375rem !important; 
+}
+h1 + .stMarkdown > p:first-child,
+h1 + .stCaption {
+  font-family: 'Plus Jakarta Sans', sans-serif !important;
+  font-size: 0.95rem !important;
+  color: var(--muted) !important;
+  font-weight: 400 !important;
+  margin-top: -0.25rem !important;
+  margin-bottom: 1.75rem !important;
+  line-height: 1.6 !important;
+}
+
+h2 { 
+  font-size: clamp(1.25rem, 2vw, 1.5rem) !important; 
+  font-weight: 500 !important; 
+  color: var(--ink) !important; 
+  margin-top: 2.25rem !important; 
+  margin-bottom: 1.125rem !important; 
+}
+
+h3 { 
+  font-size: 1.05rem !important; 
+  font-weight: 500 !important; 
+  color: var(--ink) !important; 
+  margin-bottom: 0.75rem !important; 
+}
+
+/* Global UI Font */
+.stButton > button,
+.stFormSubmitButton > button,
+.stSelectbox, .stTextInput, .stTextArea, .stNumberInput,
+.stToggle, .stCheckbox, .stRadio,
+.stMarkdown, .stCaption, .stAlert,
+[data-testid="stDataFrame"] {
+  font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, sans-serif !important;
+}
+
+/* Monospace for Technical Data */
+code, kbd, samp,
+[data-testid="stCodeBlock"],
+.stCodeBlock,
+.log-line,
+.stMarkdown code,
+.stNumberInput input,
+.stTextInput input[type="text"],
+[data-testid="stMetricValue"],
+[data-testid="stMetricLabel"],
+.stMetric [data-testid="stMetricValue"],
+.stMetric [data-testid="stMetricLabel"] {
+  font-family: 'JetBrains Mono', 'Fira Code', 'Monaco', 'Menlo', monospace !important;
+  font-variant-numeric: tabular-nums !important;
+  font-feature-settings: "tnum" "liga" "calt" !important;
+}
+
+/* ============================================================
+   GLOBAL CANVAS & AMBIENT BACKGROUND
+============================================================ */
+html, body, [data-testid="stAppViewContainer"] {
+  background: var(--bg-warm) !important;
+  background-image: radial-gradient(ellipse 80% 50% at 100% 0%, #FAF8F3 0%, #F4F0E8 60%, #F6F3EC 100%) !important;
+  color: var(--ink) !important;
+  font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, sans-serif !important;
+  -webkit-font-smoothing: antialiased !important;
+  -moz-osx-font-smoothing: grayscale !important;
+}
+
+[data-testid="stMainBlockContainer"] {
+  background: transparent !important;
+  padding-top: 128px !important;
+  max-width: 1600px !important;
+  animation: fadeIn 0.55s var(--ease-smooth) forwards !important;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+/* ============================================================
+   HIDE SIDEBAR COMPLETELY
+============================================================ */
+[data-testid="stSidebar"] {
+  display: none !important;
+}
+[data-testid="stSidebar"] > div {
+  display: none !important;
+}
+[data-testid="stSidebarCollapseButton"] {
+  display: none !important;
+}
+[data-testid="collapsedControl"] {
+  display: none !important;
+}
+[data-testid="stSidebarNav"] {
+  display: none !important;
+}
+
+/* ============================================================
+   PRESERVE MATERIAL SYMBOLS ROUNDED FONT FOR ICONS
+============================================================ */
+[data-testid="stIconMaterial"],
+.material-symbols-rounded,
+span[class*="material-symbol"],
+span[class*="material-icons"],
+.stButton > button span[data-testid="stIconMaterial"],
+.stButton > button .material-symbols-rounded,
+.stButton > button .material-icons,
+.stButton > button [data-testid="stIconMaterial"] {
+  font-family: "Material Symbols Rounded", sans-serif !important;
+  font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24 !important;
+  font-weight: normal !important;
+  font-style: normal !important;
+  font-size: 1.25rem !important;
+  line-height: 1 !important;
+  letter-spacing: normal !important;
+  text-transform: none !important;
+  white-space: nowrap !important;
+  direction: ltr !important;
+}
+
+/* ============================================================
+   EXECUTIVE KPI METRIC CARDS — Dark Charcoal with Gold/Ivory
+============================================================ */
+.kpi-card {
+  background: var(--panel-obsidian) !important;
   border: 1px solid var(--panel-border) !important;
   border-radius: var(--radius-lg) !important;
-  padding: 1rem 1.25rem !important;
-  margin-top: 1rem !important;
-}
-
-/* ============================================================
-   NATIVE STREAMLIT CONTAINERS — Elevated Light Cards
-============================================================ */
-[data-testid="stVerticalBlockBorderWrapper"] {
-  background: var(--card-porcelain) !important;
-  border: 1px solid var(--card-border) !important;
-  border-radius: var(--radius-lg) !important;
-  padding: 1.5rem !important;
-  box-shadow: var(--shadow-sm) !important;
+  padding: 1.35rem 1.5rem !important;
+  text-align: center !important;
+  color: var(--white) !important;
+  box-shadow: var(--shadow-inner), var(--shadow-lg) !important;
   transition: all var(--duration-normal) var(--ease-smooth) !important;
 }
-
-[data-testid="stVerticalBlockBorderWrapper"]:hover {
-  box-shadow: var(--shadow-md) !important;
-  transform: translateY(-1px) !important;
-  border-color: var(--ochre-border) !important;
+.kpi-card:hover { 
+  border-color: var(--ochre-border) !important; 
+  transform: translateY(-2px) !important; 
+  box-shadow: var(--shadow-inner), 0 16px 48px -16px rgba(212, 175, 55, 0.15) !important;
+}
+.kpi-card .value { 
+  font-family: 'JetBrains Mono', monospace !important;
+  font-variant-numeric: tabular-nums !important;
+  font-size: clamp(1.75rem, 3vw, 2.1rem) !important; 
+  font-weight: 700 !important; 
+  color: var(--ochre-gold) !important; 
+  display: block !important; 
+  margin-bottom: 0.25rem !important; 
+  line-height: 1.1 !important; 
+  letter-spacing: -0.02em !important;
+}
+.kpi-card .label { 
+  font-family: 'Plus Jakarta Sans', sans-serif !important;
+  font-size: 0.68rem !important; 
+  text-transform: uppercase !important; 
+  letter-spacing: 0.1em !important; 
+  color: var(--silver) !important; 
+  display: block !important; 
+  font-weight: 600 !important; 
+}
+.kpi-card .sub { 
+  font-family: 'Plus Jakarta Sans', sans-serif !important;
+  font-size: 0.72rem !important; 
+  color: var(--ochre-gold) !important; 
+  font-weight: 600 !important; 
+  display: block !important; 
+  margin-top: 0.5rem !important; 
 }
 
 /* ============================================================
-   DARK EXECUTIVE CARDS — via :has() markers
+   PIPELINE STEPPER — Refined Horizontal Progress Track
 ============================================================ */
+.pipeline-stepper {
+  display: flex !important;
+  gap: 0 !important;
+  padding: 1.25rem 1.5rem !important;
+  background: var(--panel-obsidian) !important;
+  border: 1px solid var(--panel-border) !important;
+  border-radius: var(--radius-lg) !important;
+  overflow-x: auto !important;
+  position: relative !important;
+}
+.pipeline-stepper::before {
+  content: '' !important;
+  position: absolute !important;
+  top: 50% !important;
+  left: 3.5rem !important;
+  right: 3.5rem !important;
+  height: 2px !important;
+  background: linear-gradient(90deg, var(--panel-border) 0%, var(--ochre-border) 50%, var(--panel-border) 100%) !important;
+  transform: translateY(-50%) !important;
+  z-index: 0 !important;
+}
+.pipeline-step {
+  flex: 1 !important;
+  min-width: 110px !important;
+  text-align: center !important;
+  padding: 0.75rem 0.5rem !important;
+  position: relative !important;
+  z-index: 1 !important;
+}
+.pipeline-dot {
+  width: 14px !important; 
+  height: 14px !important; 
+  border-radius: 50% !important;
+  margin: 0 auto 0.5rem !important; 
+  border: 2px solid rgba(255,255,255,0.12) !important;
+  background: var(--panel-obsidian) !important; 
+  transition: all var(--duration-normal) var(--ease-smooth) !important;
+  position: relative !important;
+  box-shadow: 0 0 0 4px var(--panel-obsidian) !important;
+}
+.pipeline-step.armed .pipeline-dot { 
+  background: var(--emerald) !important; 
+  border-color: var(--emerald) !important; 
+  box-shadow: 0 0 0 4px var(--panel-obsidian), 0 0 12px var(--emerald-glow) !important; 
+}
+.pipeline-step.queued .pipeline-dot { 
+  background: var(--ochre-gold) !important; 
+  border-color: var(--ochre-gold) !important; 
+  box-shadow: 0 0 0 4px var(--panel-obsidian), 0 0 12px var(--ochre-wash) !important; 
+}
+.pipeline-step.standby .pipeline-dot { 
+  background: var(--panel-obsidian) !important; 
+  border-color: rgba(255,255,255,0.12) !important; 
+}
+.pipeline-label { 
+  font-family: 'Plus Jakarta Sans', sans-serif !important;
+  font-size: 0.68rem !important; 
+  text-transform: uppercase !important; 
+  letter-spacing: 0.08em !important; 
+  color: var(--silver-dim) !important; 
+  font-weight: 600 !important; 
+  white-space: nowrap !important;
+}
+.pipeline-step.armed .pipeline-label { color: var(--emerald) !important; font-weight: 700 !important; }
+.pipeline-step.queued .pipeline-label { color: var(--ochre-gold) !important; font-weight: 700 !important; }
+.pipeline-step.standby .pipeline-label { color: var(--silver-dim) !important; }
+
+/* ============================================================
+   STATUS BADGES — Refined Editorial Style
+============================================================ */
+.tag {
+  display: inline-flex !important;
+  align-items: center !important;
+  padding: 0.175rem 0.625rem !important;
+  border-radius: var(--radius-pill) !important;
+  font-family: 'Plus Jakarta Sans', sans-serif !important;
+  font-size: 0.65rem !important;
+  font-weight: 600 !important;
+  text-transform: uppercase !important;
+  letter-spacing: 0.06em !important;
+  margin-right: 0.35rem !important;
+  margin-bottom: 0.25rem !important;
+}
+.tag-armed { background: rgba(16, 185, 129, 0.18) !important; color: #34D399 !important; border: 1px solid rgba(52, 211, 153, 0.4) !important; }
+.tag-standby { background: rgba(255, 255, 255, 0.08) !important; color: #E2E8F0 !important; border: 1px solid rgba(255, 255, 255, 0.18) !important; }
+.tag-draft { background: rgba(212, 175, 55, 0.12) !important; color: #B88A1A !important; border: 1px solid rgba(212, 175, 55, 0.25) !important; }
+.tag-needs_review { background: rgba(212, 175, 55, 0.12) !important; color: #C9A227 !important; border: 1px solid rgba(212, 175, 55, 0.25) !important; }
+.tag-approved { background: rgba(16, 185, 129, 0.12) !important; color: #059669 !important; border: 1px solid rgba(16, 185, 129, 0.25) !important; }
+.tag-rejected { background: rgba(239, 68, 68, 0.1) !important; color: #DC2626 !important; border: 1px solid rgba(239, 68, 68, 0.2) !important; }
+.tag-failed { background: rgba(148, 163, 184, 0.1) !important; color: #64748B !important; border: 1px solid rgba(148, 163, 184, 0.2) !important; }
+.tag-queued { background: rgba(212, 175, 55, 0.12) !important; color: #C9A227 !important; border: 1px solid rgba(212, 175, 55, 0.25) !important; }
+.tag-done { background: rgba(16, 185, 129, 0.12) !important; color: #059669 !important; border: 1px solid rgba(16, 185, 129, 0.25) !important; }
+
+/* ============================================================
+   BUTTONS — Tactile Micro-Interactions
+============================================================ */
+.stButton > button, .stFormSubmitButton > button {
+  border-radius: var(--radius-md) !important;
+  font-family: 'Plus Jakarta Sans', sans-serif !important;
+  font-weight: 600 !important;
+  font-size: 0.875rem !important;
+  letter-spacing: 0.01em !important;
+  transition: all var(--duration-normal) var(--ease-smooth) !important;
+  border: 1px solid var(--card-border) !important;
+  background: #FFFFFF !important;
+  color: var(--ink) !important;
+  padding: 0.625rem 1.375rem !important;
+}
+.stButton > button:hover, .stFormSubmitButton > button:hover {
+  border-color: var(--ochre-gold) !important;
+  color: var(--ink) !important;
+  background: #FEFEF8 !important;
+  transform: translateY(-1px) !important;
+  box-shadow: var(--shadow-sm) !important;
+}
+.stButton > button:active, .stFormSubmitButton > button:active {
+  transform: translateY(0) !important;
+}
+.stButton > button[kind="primary"], .stFormSubmitButton > button[kind="primary"] {
+  background: var(--panel-obsidian) !important;
+  border-color: var(--ochre-border) !important;
+  color: var(--white) !important;
+  box-shadow: 0 0 0 1px var(--ochre-border) inset !important;
+}
+.stButton > button[kind="primary"]:hover, .stFormSubmitButton > button[kind="primary"]:hover {
+  background: var(--panel-obsidian-elevated) !important;
+  border-color: var(--ochre-gold) !important;
+  color: var(--white) !important;
+  box-shadow: 0 4px 20px rgba(212, 175, 55, 0.25) !important;
+}
+.stButton > button[kind="secondary"] {
+  background: var(--card-porcelain) !important;
+  border-color: var(--card-border) !important;
+  color: var(--ink) !important;
+}
+.stButton > button[kind="secondary"]:hover {
+  background: #F3EFE6 !important;
+  border-color: var(--ochre-border) !important;
+  color: var(--ink) !important;
+}
+
+/* ============================================================
+   INPUTS — Clean, Consistent, High-Contrast
+============================================================ */
+.stTextInput > div > div > input,
+.stTextArea > div > div > textarea,
+.stSelectbox > div > div,
+.stNumberInput > div > div > input {
+  background: #FFFFFF !important;
+  border: 1px solid var(--card-border) !important;
+  border-radius: var(--radius-md) !important;
+  color: var(--ink) !important;
+  font-family: 'Plus Jakarta Sans', sans-serif !important;
+  font-size: 0.9rem !important;
+  padding: 0.625rem 0.875rem !important;
+  transition: all var(--duration-fast) var(--ease-smooth) !important;
+}
+.stTextInput > div > div > input:focus,
+.stTextArea > div > div > textarea:focus,
+.stSelectbox > div > div:focus-within,
+.stNumberInput > div > div > input:focus {
+  border-color: var(--ochre-gold) !important;
+  box-shadow: var(--shadow-gold) !important;
+  outline: none !important;
+}
+.stSelectbox > div > div {
+  background: #FFFFFF !important;
+  border: 1px solid var(--card-border) !important;
+  border-radius: var(--radius-md) !important;
+}
+.stTextArea > div > div > textarea {
+  min-height: 100px !important;
+  resize: vertical !important;
+  line-height: 1.6 !important;
+  font-family: 'Plus Jakarta Sans', sans-serif !important;
+}
+.stToggle > label { 
+  color: var(--ink) !important; 
+  font-family: 'Plus Jakarta Sans', sans-serif !important;
+  font-weight: 500 !important;
+}
 
 /* ============================================================
    DARK EXECUTIVE CARDS — via :has() markers (FIX 2)
@@ -879,132 +1009,188 @@ html, body, [data-testid="stAppViewContainer"] {
 /* Agent Fleet Dark Cards - True Dark Obsidian Charcoal */
 [data-testid="stVerticalBlockBorderWrapper"]:has(.agent-card-marker),
 div[data-testid="stContainer"]:has(.agent-card-marker),
-div.element-container:has(.agent-card-marker) > div[data-testid="stVerticalBlockBorderWrapper"] {
+div:has(> div > .agent-card-marker),
+div:has(> div > div > .agent-card-marker) {
   background: #141518 !important;
-  border: 1px solid #272A30 !important;
+  background-color: #141518 !important;
+  border: 1px solid #2A2D35 !important;
   border-radius: 16px !important;
   padding: 18px !important;
-  color: #FAF9F6 !important;
-  box-shadow: 0 8px 24px rgba(0,0,0,0.14) !important;
-  transition: all 0.22s cubic-bezier(0.16, 1, 0.3, 1) !important;
+  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.16) !important;
 }
-[data-testid="stVerticalBlockBorderWrapper"]:has(.agent-card-marker):hover,
-div[data-testid="stContainer"]:has(.agent-card-marker):hover {
-  border-color: #D4AF37 !important;
-  box-shadow: 0 12px 32px rgba(212, 175, 55, 0.18) !important;
-  transform: translateY(-2px) !important;
-}
+
+/* Force high-contrast typography inside every dark agent card */
 [data-testid="stVerticalBlockBorderWrapper"]:has(.agent-card-marker) *,
-div[data-testid="stContainer"]:has(.agent-card-marker) * {
+div[data-testid="stContainer"]:has(.agent-card-marker) *,
+div:has(> div > .agent-card-marker) *,
+div:has(> div > div > .agent-card-marker) * {
   color: #FAF9F6 !important;
 }
+
 [data-testid="stVerticalBlockBorderWrapper"]:has(.agent-card-marker) h3,
 [data-testid="stVerticalBlockBorderWrapper"]:has(.agent-card-marker) h4,
-[data-testid="stVerticalBlockBorderWrapper"]:has(.agent-card-marker) strong {
+[data-testid="stVerticalBlockBorderWrapper"]:has(.agent-card-marker) strong,
+div[data-testid="stContainer"]:has(.agent-card-marker) h3,
+div[data-testid="stContainer"]:has(.agent-card-marker) h4,
+div[data-testid="stContainer"]:has(.agent-card-marker) strong,
+div:has(> div > .agent-card-marker) h3,
+div:has(> div > .agent-card-marker) h4,
+div:has(> div > .agent-card-marker) strong,
+div:has(> div > div > .agent-card-marker) h3,
+div:has(> div > div > .agent-card-marker) h4,
+div:has(> div > div > .agent-card-marker) strong {
+  color: #FAF9F6 !important;
+  font-weight: 600 !important;
+}
+
+[data-testid="stVerticalBlockBorderWrapper"]:has(.agent-card-marker) .stMarkdown,
+div[data-testid="stContainer"]:has(.agent-card-marker) .stMarkdown {
   color: #FAF9F6 !important;
 }
-[data-testid="stVerticalBlockBorderWrapper"]:has(.agent-card-marker) .stMarkdown {
-  color: #FAF9F6 !important;
+
+[data-testid="stVerticalBlockBorderWrapper"]:has(.agent-card-marker) .stCaption,
+div[data-testid="stContainer"]:has(.agent-card-marker) .stCaption {
+  color: #CBD5E1 !important;
+  font-size: 0.86rem !important;
+  opacity: 1 !important;
 }
-[data-testid="stVerticalBlockBorderWrapper"]:has(.agent-card-marker) .stCaption {
-  color: #A1A1AA !important;
-}
-[data-testid="stVerticalBlockBorderWrapper"]:has(.agent-card-marker) .stTextInput label,
-[data-testid="stVerticalBlockBorderWrapper"]:has(.agent-card-marker) .stNumberInput label,
+
+/* Toggle labels, input labels, captions */
 [data-testid="stVerticalBlockBorderWrapper"]:has(.agent-card-marker) .stToggle label,
+[data-testid="stVerticalBlockBorderWrapper"]:has(.agent-card-marker) .stNumberInput label,
+[data-testid="stVerticalBlockBorderWrapper"]:has(.agent-card-marker) .stTextInput label,
 [data-testid="stVerticalBlockBorderWrapper"]:has(.agent-card-marker) .stSelectbox label,
 [data-testid="stVerticalBlockBorderWrapper"]:has(.agent-card-marker) .stTextInput > div > label,
 [data-testid="stVerticalBlockBorderWrapper"]:has(.agent-card-marker) .stNumberInput > div > label,
-[data-testid="stVerticalBlockBorderWrapper"]:has(.agent-card-marker) .stToggle > label {
+[data-testid="stVerticalBlockBorderWrapper"]:has(.agent-card-marker) .stToggle > label,
+div[data-testid="stContainer"]:has(.agent-card-marker) .stToggle label,
+div[data-testid="stContainer"]:has(.agent-card-marker) .stNumberInput label,
+div[data-testid="stContainer"]:has(.agent-card-marker) .stTextInput label,
+div[data-testid="stContainer"]:has(.agent-card-marker) .stSelectbox label {
   color: #FAF9F6 !important;
+  font-weight: 600 !important;
+  opacity: 1 !important;
 }
-[data-testid="stVerticalBlockBorderWrapper"]:has(.agent-card-marker) .stProgress > div > div > div {
-  background: #D4AF37 !important;
+
+/* Status badges */
+[data-testid="stVerticalBlockBorderWrapper"]:has(.agent-card-marker) .tag-armed,
+div[data-testid="stContainer"]:has(.agent-card-marker) .tag-armed {
+  background: rgba(16, 185, 129, 0.18) !important;
+  color: #34D399 !important;
+  border: 1px solid rgba(52, 211, 153, 0.4) !important;
 }
-[data-testid="stVerticalBlockBorderWrapper"]:has(.agent-card-marker) .stButton > button[kind="primary"] {
-  background: #1F2229 !important;
+[data-testid="stVerticalBlockBorderWrapper"]:has(.agent-card-marker) .tag-standby,
+div[data-testid="stContainer"]:has(.agent-card-marker) .tag-standby {
+  background: rgba(255, 255, 255, 0.08) !important;
+  color: #E2E8F0 !important;
+  border: 1px solid rgba(255, 255, 255, 0.18) !important;
+}
+
+/* Number Input inside Dark Agent Card */
+[data-testid="stVerticalBlockBorderWrapper"]:has(.agent-card-marker) .stNumberInput > div > div > input,
+div[data-testid="stContainer"]:has(.agent-card-marker) .stNumberInput > div > div > input {
+  background: #1E2028 !important;
+  color: #FAF9F6 !important;
+  border: 1px solid #383C47 !important;
+  border-radius: var(--radius-md) !important;
+}
+
+/* Save button inside Dark Agent Card */
+[data-testid="stVerticalBlockBorderWrapper"]:has(.agent-card-marker) .stButton > button[kind="primary"],
+div[data-testid="stContainer"]:has(.agent-card-marker) .stButton > button[kind="primary"] {
+  background: #1E2028 !important;
   color: #D4AF37 !important;
-  border: 1px solid rgba(212,175,55,0.5) !important;
+  border: 1px solid rgba(212, 175, 55, 0.55) !important;
+  font-weight: 600 !important;
 }
-[data-testid="stVerticalBlockBorderWrapper"]:has(.agent-card-marker) .stButton > button[kind="primary"]:hover {
+[data-testid="stVerticalBlockBorderWrapper"]:has(.agent-card-marker) .stButton > button[kind="primary"]:hover,
+div[data-testid="stContainer"]:has(.agent-card-marker) .stButton > button[kind="primary"]:hover {
   background: #272C35 !important;
   border-color: #D4AF37 !important;
 }
-[data-testid="stVerticalBlockBorderWrapper"]:has(.agent-card-marker) .stButton > button[kind="secondary"] {
+
+/* Run button inside Dark Agent Card */
+[data-testid="stVerticalBlockBorderWrapper"]:has(.agent-card-marker) .stButton > button[kind="secondary"],
+div[data-testid="stContainer"]:has(.agent-card-marker) .stButton > button[kind="secondary"] {
   background: #D4AF37 !important;
   color: #141518 !important;
-  font-weight: 600 !important;
-  border-color: #D4AF37 !important;
+  font-weight: 700 !important;
+  border: none !important;
 }
-[data-testid="stVerticalBlockBorderWrapper"]:has(.agent-card-marker) .stButton > button[kind="secondary"]:hover {
+[data-testid="stVerticalBlockBorderWrapper"]:has(.agent-card-marker) .stButton > button[kind="secondary"]:hover,
+div[data-testid="stContainer"]:has(.agent-card-marker) .stButton > button[kind="secondary"]:hover {
   background: #C9A227 !important;
-  border-color: #C9A227 !important;
-  color: #141518 !important;
 }
 
-/* Agent Fleet Inputs in Dark Cards - Seamless blending */
+/* Number Input inside Dark Agent Card */
 [data-testid="stVerticalBlockBorderWrapper"]:has(.agent-card-marker) .stNumberInput > div > div > input,
-[data-testid="stVerticalBlockBorderWrapper"]:has(.agent-card-marker) .stTextInput > div > div > input,
-[data-testid="stVerticalBlockBorderWrapper"]:has(.agent-card-marker) .stSelectbox > div > div,
-[data-testid="stVerticalBlockBorderWrapper"]:has(.agent-card-marker) .stTextArea > div > div > textarea {
-  background: #1E2025 !important;
-  border: 1px solid rgba(255,255,255,0.12) !important;
+div[data-testid="stContainer"]:has(.agent-card-marker) .stNumberInput > div > div > input {
+  background: #1E2028 !important;
   color: #FAF9F6 !important;
+  border: 1px solid #383C47 !important;
+  border-radius: var(--radius-md) !important;
+}
+
+/* ============================================================
+   LIGHT PANEL CARDS — Task Dispatch Studio & Task Queue (FIX 3)
+============================================================ */
+
+/* Light Panel Cards — Clean White/Alabaster */
+[data-testid="stVerticalBlockBorderWrapper"]:has(.light-panel-marker),
+div[data-testid="stContainer"]:has(.light-panel-marker),
+div:has(> div > .light-panel-marker) {
+  background: #FFFFFF !important;
+  background-color: #FFFFFF !important;
+  border: 1px solid #E2DDD2 !important;
+  border-radius: 16px !important;
+  padding: 20px !important;
+  box-shadow: 0 4px 20px rgba(24, 24, 27, 0.06) !important;
+}
+
+/* Force high-contrast dark text inside light panels */
+[data-testid="stVerticalBlockBorderWrapper"]:has(.light-panel-marker) *,
+div[data-testid="stContainer"]:has(.light-panel-marker) * {
+  color: #18181B !important;
+}
+
+[data-testid="stVerticalBlockBorderWrapper"]:has(.light-panel-marker) label,
+[data-testid="stVerticalBlockBorderWrapper"]:has(.light-panel-marker) .stSelectbox label,
+[data-testid="stVerticalBlockBorderWrapper"]:has(.light-panel-marker) .stTextInput label,
+[data-testid="stVerticalBlockBorderWrapper"]:has(.light-panel-marker) .stTextArea label,
+[data-testid="stVerticalBlockBorderWrapper"]:has(.light-panel-marker) .stNumberInput label,
+div[data-testid="stContainer"]:has(.light-panel-marker) label,
+div[data-testid="stContainer"]:has(.light-panel-marker) .stSelectbox label,
+div[data-testid="stContainer"]:has(.light-panel-marker) .stTextInput label,
+div[data-testid="stContainer"]:has(.light-panel-marker) .stTextArea label,
+div[data-testid="stContainer"]:has(.light-panel-marker) .stNumberInput label {
+  color: #18181B !important;
+  font-weight: 600 !important;
+}
+
+[data-testid="stVerticalBlockBorderWrapper"]:has(.light-panel-marker) .stSelectbox > div > div,
+[data-testid="stVerticalBlockBorderWrapper"]:has(.light-panel-marker) .stTextInput > div > div > input,
+[data-testid="stVerticalBlockBorderWrapper"]:has(.light-panel-marker) .stTextArea > div > div > textarea,
+[data-testid="stVerticalBlockBorderWrapper"]:has(.light-panel-marker) .stNumberInput > div > div > input,
+div[data-testid="stContainer"]:has(.light-panel-marker) .stSelectbox > div > div,
+div[data-testid="stContainer"]:has(.light-panel-marker) .stTextInput > div > div > input,
+div[data-testid="stContainer"]:has(.light-panel-marker) .stTextArea > div > div > textarea,
+div[data-testid="stContainer"]:has(.light-panel-marker) .stNumberInput > div > div > input {
+  background: #F8FAFC !important;
+  border: 1px solid #CBD5E1 !important;
+  color: #18181B !important;
   border-radius: 12px !important;
 }
-[data-testid="stVerticalBlockBorderWrapper"]:has(.agent-card-marker) .stNumberInput > div > div > input:focus,
-[data-testid="stVerticalBlockBorderWrapper"]:has(.agent-card-marker) .stTextInput > div > div > input:focus,
-[data-testid="stVerticalBlockBorderWrapper"]:has(.agent-card-marker) .stSelectbox > div > div:focus-within {
-  border-color: #D4AF37 !important;
-  box-shadow: 0 0 0 3px rgba(212, 175, 55, 0.15) !important;
+
+[data-testid="stVerticalBlockBorderWrapper"]:has(.light-panel-marker) .stTextInput > div > div > input::placeholder,
+[data-testid="stVerticalBlockBorderWrapper"]:has(.light-panel-marker) .stTextArea > div > div > textarea::placeholder,
+div[data-testid="stContainer"]:has(.light-panel-marker) .stTextInput > div > div > input::placeholder,
+div[data-testid="stContainer"]:has(.light-panel-marker) .stTextArea > div > div > textarea::placeholder {
+  color: #64748B !important;
 }
 
-/* Right panel (Task Dispatch Studio) - Clean White/Alabaster Cards */
-[data-testid="stVerticalBlockBorderWrapper"]:has(.task-dispatch-marker) {
-  background: #FFFFFF !important;
-  border: 1px solid #E5E0D5 !important;
-  border-radius: 16px !important;
-  padding: 1.5rem !important;
-  box-shadow: 0 2px 12px rgba(24, 24, 27, 0.06) !important;
-  transition: all 0.22s cubic-bezier(0.16, 1, 0.3, 1) !important;
-}
-[data-testid="stVerticalBlockBorderWrapper"]:has(.task-dispatch-marker) * {
-  color: #18181B !important;
-}
-[data-testid="stVerticalBlockBorderWrapper"]:has(.task-dispatch-marker) .stSelectbox label,
-[data-testid="stVerticalBlockBorderWrapper"]:has(.task-dispatch-marker) .stTextInput label,
-[data-testid="stVerticalBlockBorderWrapper"]:has(.task-dispatch-marker) .stTextArea label,
-[data-testid="stVerticalBlockBorderWrapper"]:has(.task-dispatch-marker) .stNumberInput label {
-  color: #18181B !important;
-}
-[data-testid="stVerticalBlockBorderWrapper"]:has(.task-dispatch-marker) .stSelectbox > div > div,
-[data-testid="stVerticalBlockBorderWrapper"]:has(.task-dispatch-marker) .stTextInput > div > div > input,
-[data-testid="stVerticalBlockBorderWrapper"]:has(.task-dispatch-marker) .stTextArea > div > div > textarea,
-[data-testid="stVerticalBlockBorderWrapper"]:has(.task-dispatch-marker) .stNumberInput > div > div > input {
-  background: #FFFFFF !important;
-  border: 1px solid #DCD5C7 !important;
-  color: #18181B !important;
-  border-radius: 10px !important;
-}
-[data-testid="stVerticalBlockBorderWrapper"]:has(.task-dispatch-marker) .stTextInput > div > div > input::placeholder,
-[data-testid="stVerticalBlockBorderWrapper"]:has(.task-dispatch-marker) .stTextArea > div > div > textarea::placeholder {
-  color: #71717A !important;
-}
-
-/* Task Queue Cards - Clean White/Alabaster */
-[data-testid="stVerticalBlockBorderWrapper"]:has(.task-queue-marker) {
-  background: #FFFFFF !important;
-  border: 1px solid #E5E0D5 !important;
-  border-radius: 16px !important;
-  padding: 1.25rem !important;
-  box-shadow: 0 2px 12px rgba(24, 24, 27, 0.06) !important;
-  transition: all 0.22s cubic-bezier(0.16, 1, 0.3, 1) !important;
-}
-[data-testid="stVerticalBlockBorderWrapper"]:has(.task-queue-marker) * {
-  color: #18181B !important;
-}
-
-/* Login Card Dark */
+/* ============================================================
+   LOGIN CARD DARK
+============================================================ */
 [data-testid="stVerticalBlockBorderWrapper"]:has(.login-marker) {
   background: #141518 !important;
   border: 1px solid #272A30 !important;
@@ -1047,51 +1233,6 @@ div[data-testid="stContainer"]:has(.agent-card-marker) * {
 [data-testid="stVerticalBlockBorderWrapper"]:has(.login-marker) .stFormSubmitButton > button:hover {
   background: #C9A227 !important;
   border-color: #C9A227 !important;
-}
-
-/* Login Card Dark */
-[data-testid="stVerticalBlockBorderWrapper"]:has(.login-marker) {
-  background: var(--panel-obsidian) !important;
-  border: 1px solid var(--panel-border) !important;
-  border-radius: var(--radius-xl) !important;
-  padding: 2.5rem 2rem !important;
-  color: var(--white) !important;
-  box-shadow: var(--shadow-inner), 0 20px 60px -20px rgba(0,0,0,0.45) !important;
-}
-[data-testid="stVerticalBlockBorderWrapper"]:has(.login-marker) * {
-  color: var(--white) !important;
-}
-[data-testid="stVerticalBlockBorderWrapper"]:has(.login-marker) h1,
-[data-testid="stVerticalBlockBorderWrapper"]:has(.login-marker) h2,
-[data-testid="stVerticalBlockBorderWrapper"]:has(.login-marker) h3,
-[data-testid="stVerticalBlockBorderWrapper"]:has(.login-marker) h4,
-[data-testid="stVerticalBlockBorderWrapper"]:has(.login-marker) p,
-[data-testid="stVerticalBlockWrapper"]:has(.login-marker) label {
-  color: var(--white) !important;
-}
-[data-testid="stVerticalBlockBorderWrapper"]:has(.login-marker) .stTextInput > div > div > input {
-  background: var(--panel-obsidian-elevated) !important;
-  border: 1px solid rgba(255,255,255,0.12) !important;
-  color: var(--white) !important;
-  border-radius: var(--radius-md) !important;
-}
-[data-testid="stVerticalBlockBorderWrapper"]:has(.login-marker) .stTextInput > div > div > input:focus {
-  border-color: var(--ochre-gold) !important;
-  box-shadow: var(--shadow-gold) !important;
-}
-[data-testid="stVerticalBlockBorderWrapper"]:has(.login-marker) .stFormSubmitButton > button {
-  background: var(--ochre-gold) !important;
-  border-color: var(--ochre-gold) !important;
-  color: var(--panel-obsidian) !important;
-  border-radius: var(--radius-md) !important;
-  font-weight: 700 !important;
-  padding: 0.875rem 2rem !important;
-  font-size: 1rem !important;
-  letter-spacing: 0.02em !important;
-}
-[data-testid="stVerticalBlockBorderWrapper"]:has(.login-marker) .stFormSubmitButton > button:hover {
-  background: #B89022 !important;
-  border-color: var(--ochre-gold) !important;
 }
 
 /* ============================================================
@@ -1227,13 +1368,13 @@ div[data-testid="stContainer"]:has(.agent-card-marker) * {
   margin-right: 0.35rem !important;
   margin-bottom: 0.25rem !important;
 }
+.tag-armed { background: rgba(16, 185, 129, 0.18) !important; color: #34D399 !important; border: 1px solid rgba(52, 211, 153, 0.4) !important; }
+.tag-standby { background: rgba(255, 255, 255, 0.08) !important; color: #E2E8F0 !important; border: 1px solid rgba(255, 255, 255, 0.18) !important; }
 .tag-draft { background: rgba(212, 175, 55, 0.12) !important; color: #B88A1A !important; border: 1px solid rgba(212, 175, 55, 0.25) !important; }
 .tag-needs_review { background: rgba(212, 175, 55, 0.12) !important; color: #C9A227 !important; border: 1px solid rgba(212, 175, 55, 0.25) !important; }
 .tag-approved { background: rgba(16, 185, 129, 0.12) !important; color: #059669 !important; border: 1px solid rgba(16, 185, 129, 0.25) !important; }
 .tag-rejected { background: rgba(239, 68, 68, 0.1) !important; color: #DC2626 !important; border: 1px solid rgba(239, 68, 68, 0.2) !important; }
 .tag-failed { background: rgba(148, 163, 184, 0.1) !important; color: #64748B !important; border: 1px solid rgba(148, 163, 184, 0.2) !important; }
-.tag-armed { background: rgba(16, 185, 129, 0.12) !important; color: #059669 !important; border: 1px solid rgba(16, 185, 129, 0.25) !important; }
-.tag-standby { background: rgba(148, 163, 184, 0.1) !important; color: #64748B !important; border: 1px solid rgba(148, 163, 184, 0.2) !important; }
 .tag-queued { background: rgba(212, 175, 55, 0.12) !important; color: #C9A227 !important; border: 1px solid rgba(212, 175, 55, 0.25) !important; }
 .tag-done { background: rgba(16, 185, 129, 0.12) !important; color: #059669 !important; border: 1px solid rgba(16, 185, 129, 0.25) !important; }
 
@@ -1326,25 +1467,6 @@ div[data-testid="stContainer"]:has(.agent-card-marker) * {
   font-weight: 500 !important;
 }
 
-/* Dark Card Inputs — Seamless blending */
-[data-testid="stVerticalBlockBorderWrapper"]:has(.agent-card-marker) .stNumberInput > div > div > input,
-[data-testid="stVerticalBlockBorderWrapper"]:has(.agent-card-marker) .stTextInput > div > div > input,
-[data-testid="stVerticalBlockBorderWrapper"]:has(.agent-card-marker) .stSelectbox > div > div,
-[data-testid="stVerticalBlockBorderWrapper"]:has(.agent-card-marker) .stTextArea > div > div > textarea,
-[data-testid="stVerticalBlockBorderWrapper"]:has(.login-marker) .stTextInput > div > div > input {
-  background: var(--panel-obsidian-elevated) !important;
-  border: 1px solid rgba(255,255,255,0.12) !important;
-  color: var(--white) !important;
-  border-radius: var(--radius-md) !important;
-}
-[data-testid="stVerticalBlockBorderWrapper"]:has(.agent-card-marker) .stNumberInput > div > div > input:focus,
-[data-testid="stVerticalBlockBorderWrapper"]:has(.agent-card-marker) .stTextInput > div > div > input:focus,
-[data-testid="stVerticalBlockBorderWrapper"]:has(.agent-card-marker) .stSelectbox > div > div:focus-within,
-[data-testid="stVerticalBlockBorderWrapper"]:has(.login-marker) .stTextInput > div > div > input:focus {
-  border-color: var(--ochre-gold) !important;
-  box-shadow: var(--shadow-gold) !important;
-}
-
 /* ============================================================
    DATAFRAMES — Clean Tables
 ============================================================ */
@@ -1372,245 +1494,16 @@ div[data-testid="stContainer"]:has(.agent-card-marker) * {
 .log-line.inf { color: var(--ochre-gold) !important; }
 
 /* ============================================================
-   SIDEBAR TOGGLE BUTTON — Visible & Bespoke (Fix 1)
-============================================================ */
-/* CRITICAL: Preserve Material Symbols Rounded font for ALL Streamlit icons */
-[data-testid="stIconMaterial"],
-.material-symbols-rounded,
-span[class*="material-symbol"],
-span[class*="material-icons"],
-.stButton > button span[data-testid="stIconMaterial"],
-.stButton > button .material-symbols-rounded {
-  font-family: "Material Symbols Rounded", sans-serif !important;
-  font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24 !important;
-  font-weight: normal !important;
-  font-style: normal !important;
-  font-size: 1.25rem !important;
-  line-height: 1 !important;
-  letter-spacing: normal !important;
-  text-transform: none !important;
-  white-space: nowrap !important;
-  direction: ltr !important;
-}
-
-/* Header: transparent bg, no pointer events on header itself */
-header[data-testid="stHeader"] {
-  background: transparent !important;
-  height: 3.4rem !important;
-  pointer-events: none !important;
-}
-header[data-testid="stHeader"] > div {
-  pointer-events: auto !important;
-}
-
-/* Expanded state: sidebar collapse button */
-[data-testid="stSidebarCollapseButton"] button,
-header[data-testid="stHeader"] [data-testid="stSidebarCollapseButton"] button {
-  background: var(--panel-obsidian) !important;
-  color: var(--ochre-gold) !important;
-  border: 1px solid var(--ochre-border) !important;
-  border-radius: var(--radius-md) !important;
-  padding: 0.4rem 0.7rem !important;
-  font-size: 1.25rem !important;
-  display: flex !important;
-  align-items: center !important;
-  justify-content: center !important;
-  opacity: 1 !important;
-  visibility: visible !important;
-  z-index: 999999 !important;
-  width: 36px !important;
-  height: 36px !important;
-  min-width: 36px !important;
-  min-height: 36px !important;
-  pointer-events: auto !important;
-  transition: all var(--duration-fast) var(--ease-smooth) !important;
-}
-
-/* Collapsed state: expand sidebar button */
-[data-testid="collapsedControl"] button,
-[data-testid="stExpandSidebarButton"] button {
-  background: var(--panel-obsidian) !important;
-  color: var(--ochre-gold) !important;
-  border: 1px solid rgba(212, 175, 55, 0.45) !important;
-  border-radius: var(--radius-md) !important;
-  padding: 0.4rem 0.7rem !important;
-  font-size: 1.25rem !important;
-  display: flex !important;
-  align-items: center !important;
-  justify-content: center !important;
-  opacity: 1 !important;
-  visibility: visible !important;
-  z-index: 999999 !important;
-  width: 36px !important;
-  height: 36px !important;
-  min-width: 36px !important;
-  min-height: 36px !important;
-  pointer-events: auto !important;
-  transition: all var(--duration-fast) var(--ease-smooth) !important;
-}
-
-/* Hover states for both */
-[data-testid="stSidebarCollapseButton"] button:hover,
-[data-testid="collapsedControl"] button:hover,
-[data-testid="stExpandSidebarButton"] button:hover {
-  background: var(--ochre-gold) !important;
-  color: var(--panel-obsidian) !important;
-  border-color: var(--ochre-gold) !important;
-}
-
-/* Ensure header allows pointer events for its button children */
-header[data-testid="stHeader"] {
-  background: transparent !important;
-  height: 3.4rem !important;
-  pointer-events: none !important;
-}
-header[data-testid="stHeader"] > div,
-header[data-testid="stHeader"] > div > div {
-  pointer-events: auto !important;
-}
-header[data-testid="stHeader"] button {
-  pointer-events: auto !important;
-}
-
-/* Preserve Material Symbols Rounded font for ALL Streamlit icons */
-[data-testid="stIconMaterial"],
-.material-symbols-rounded,
-span[class*="material-symbol"],
-span[class*="material-icons"],
-.stButton > button span[data-testid="stIconMaterial"],
-.stButton > button .material-symbols-rounded,
-.stButton > button .material-icons,
-.stButton > button [data-testid="stIconMaterial"] {
-  font-family: "Material Symbols Rounded", sans-serif !important;
-  font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24 !important;
-  font-weight: normal !important;
-  font-style: normal !important;
-  font-size: 1.25rem !important;
-  line-height: 1 !important;
-  letter-spacing: normal !important;
-  text-transform: none !important;
-  white-space: nowrap !important;
-  direction: ltr !important;
-}
-
-/* Header: transparent bg, no pointer events on header itself */
-header[data-testid="stHeader"] {
-  background: transparent !important;
-  height: 3.4rem !important;
-  pointer-events: none !important;
-}
-header[data-testid="stHeader"] > div {
-  pointer-events: auto !important;
-}
-
-/* Expanded state: sidebar collapse button */
-[data-testid="stSidebarCollapseButton"] button,
-header[data-testid="stHeader"] [data-testid="stSidebarCollapseButton"] button {
-  background: var(--panel-obsidian) !important;
-  color: var(--ochre-gold) !important;
-  border: 1px solid var(--ochre-border) !important;
-  border-radius: var(--radius-md) !important;
-  padding: 0.4rem 0.7rem !important;
-  font-size: 1.25rem !important;
-  display: flex !important;
-  align-items: center !important;
-  justify-content: center !important;
-  opacity: 1 !important;
-  visibility: visible !important;
-  z-index: 999999 !important;
-  width: 36px !important;
-  height: 36px !important;
-  min-width: 36px !important;
-  min-height: 36px !important;
-  pointer-events: auto !important;
-  transition: all var(--duration-fast) var(--ease-smooth) !important;
-}
-
-/* Collapsed state: expand sidebar button */
-[data-testid="collapsedControl"] button,
-[data-testid="stExpandSidebarButton"] button {
-  background: var(--panel-obsidian) !important;
-  color: var(--ochre-gold) !important;
-  border: 1px solid rgba(212, 175, 55, 0.45) !important;
-  border-radius: var(--radius-md) !important;
-  padding: 0.4rem 0.7rem !important;
-  font-size: 1.25rem !important;
-  display: flex !important;
-  align-items: center !important;
-  justify-content: center !important;
-  opacity: 1 !important;
-  visibility: visible !important;
-  z-index: 999999 !important;
-  width: 36px !important;
-  height: 36px !important;
-  min-width: 36px !important;
-  min-height: 36px !important;
-  pointer-events: auto !important;
-  transition: all var(--duration-fast) var(--ease-smooth) !important;
-}
-
-/* Hover states for both */
-[data-testid="stSidebarCollapseButton"] button:hover,
-[data-testid="collapsedControl"] button:hover,
-[data-testid="stExpandSidebarButton"] button:hover {
-  background: var(--ochre-gold) !important;
-  color: var(--panel-obsidian) !important;
-  border-color: var(--ochre-gold) !important;
-}
-
-/* Ensure header allows pointer events for its button children */
-header[data-testid="stHeader"] {
-  background: transparent !important;
-  height: 3.4rem !important;
-  pointer-events: none !important;
-}
-header[data-testid="stHeader"] > div,
-header[data-testid="stHeader"] > div > div {
-  pointer-events: auto !important;
-}
-header[data-testid="stHeader"] button {
-  pointer-events: auto !important;
-}
-
-/* ============================================================
-   CONNECTION PILL & META ROW
-============================================================ */
-.conn-pill {
-  display: inline-flex !important;
-  align-items: center !important;
-  gap: 0.5rem !important;
-  padding: 0.4rem 1rem !important;
-  border-radius: var(--radius-pill) !important;
-  font-family: 'Plus Jakarta Sans', sans-serif !important;
-  font-size: 0.68rem !important;
-  font-weight: 600 !important;
-  text-transform: uppercase !important;
-  letter-spacing: 0.08em !important;
-}
-.conn-ok { background: rgba(16, 185, 129, 0.15) !important; color: var(--emerald) !important; border: 1px solid rgba(16, 185, 129, 0.3) !important; }
-.conn-warn { background: var(--ochre-wash) !important; color: var(--ochre-gold) !important; border: 1px solid var(--ochre-border) !important; }
-
-.meta-row {
-  font-family: 'Plus Jakarta Sans', sans-serif !important;
-  font-size: 0.68rem !important;
-  color: var(--muted) !important;
-  text-transform: uppercase !important;
-  letter-spacing: 0.08em !important;
-  margin-bottom: 0.75rem !important;
-  border-bottom: 1px solid #EFE9DE !important;
-  padding-bottom: 0.625rem !important;
-}
-
-/* Progress bar */
-.stProgress > div > div > div { background: var(--ochre-gold) !important; }
-
-/* ============================================================
-   HIDE STREAMLIT CHROME (keep sidebar toggle)
+   HIDE STREAMLIT CHROME
 ============================================================ */
 #MainMenu {visibility: hidden !important;}
 footer {visibility: hidden !important;}
 [data-testid="stDeployButton"] {visibility: hidden !important;}
 [data-testid="stToolbar"] {visibility: hidden !important;}
+[data-testid="stSidebar"] {display: none !important;}
+[data-testid="stSidebarCollapseButton"] {display: none !important;}
+[data-testid="collapsedControl"] {display: none !important;}
+[data-testid="stSidebarNav"] {display: none !important;}
 </style>
 """
 
@@ -1702,8 +1595,8 @@ def fetch_brands() -> list[dict]:
 # ---------------------------------------------------------------------------
 # Page navigation state
 # ---------------------------------------------------------------------------
-if "page" not in st.session_state:
-    st.session_state.page = "command_center"
+if "active_page" not in st.session_state:
+    st.session_state.active_page = "command_center"
 
 PAGES = [
     ("command_center", "🎯 Command Center"),
@@ -1713,88 +1606,9 @@ PAGES = [
 ]
 
 
-# ===========================================================================
-# SIDEBAR — Dark Charcoal with Gold Accent + Sidebar Toggle Fixed
-# ===========================================================================
-with st.sidebar:
-    # Brand header
-    st.markdown(
-        '<div style="padding:1.5rem 1rem 0.5rem 1rem;">'
-        '<div style="font-size:1.8rem;margin-bottom:0.25rem;">⚡</div>'
-        '<div style="font-weight:700;font-size:1rem;letter-spacing:0.08em;text-transform:uppercase;">RISHI-OS</div>'
-        '<div style="font-size:0.65rem;color:#A8A296;margin-top:0.15rem;">EXECUTIVE CONSOLE</div>'
-        "</div>",
-        unsafe_allow_html=True,
-    )
-    st.divider()
-
-    # Connection status pill
-    supabase_ok = bool(_SUPABASE_URL and _SUPABASE_KEY and not _SUPABASE_URL.startswith("https://your-project"))
-    conn_class = "conn-ok" if supabase_ok else "conn-warn"
-    conn_label = "SUPABASE CONNECTED" if supabase_ok else "LOCAL SYNC MODE"
-    st.markdown(f'<div class="conn-pill {conn_class}">● {conn_label}</div>', unsafe_allow_html=True)
-    st.divider()
-
-    # Navigation
-    for key, label in PAGES:
-        active = st.session_state.page == key
-        btn_kind = "primary" if active else "secondary"
-        if st.button(label, key=f"nav_{key}", use_container_width=True, type=btn_kind):
-            st.session_state.page = key
-            safe_rerun()
-
-    st.divider()
-
-    # Global quick-action: Run Queued Tasks
-    tasks = safe_select("tasks", eq={"status": "queued"}, limit=1)
-    queued_count = len(safe_select("tasks", eq={"status": "queued"}))
-
-    if st.button(f"▶️ Run Queued Tasks ({queued_count})", key="sidebar_run_all", use_container_width=True, type="primary", disabled=queued_count == 0):
-        with st.status("Running queue-drainer…", expanded=True) as status:
-            try:
-                proc = subprocess.run(
-                    [sys.executable, "-m", "scripts.run_queued_tasks"],
-                    cwd=str(ROOT_DIR),
-                    capture_output=True,
-                    text=True,
-                    timeout=180,
-                )
-                if proc.stdout:
-                    for line in proc.stdout.splitlines():
-                        st.markdown(f'<div class="log-line {"ok" if "ok" in line.lower() else "inf"}">{line}</div>', unsafe_allow_html=True)
-                if proc.stderr:
-                    for line in proc.stderr.splitlines():
-                        st.markdown(f'<div class="log-line err">{line}</div>', unsafe_allow_html=True)
-                status.update(label="Queue drained.", state="complete")
-            except subprocess.TimeoutExpired:
-                status.update(label="Runner timed out (180s).", state="error")
-            except Exception as exc:
-                status.update(label=f"Runner error: {exc}", state="error")
-        safe_rerun()
-
-    st.divider()
-    st.caption("Zero AI. Zero agent execution.")
-
-    # Providers status
-    providers = config.available_providers()
-    ready_count = len(providers)
-    total_count = len(config.PROVIDERS)
-    st.markdown(
-        f'<div style="background:#18181B;border:1px solid #2A2A2E;border-radius:14px;padding:1rem;margin-top:0.5rem;">'
-        f'<div style="font-size:0.65rem;text-transform:uppercase;letter-spacing:0.08em;color:#A8A296;margin-bottom:0.5rem;">Providers</div>'
-        f'<div style="font-size:0.85rem;font-weight:600;">{len(config.available_providers())} / {len(config.PROVIDERS)} reachable</div>'
-        f'</div>',
-        unsafe_allow_html=True,
-    )
-    st.divider()
-    if st.button("🚪 Sign out", key="nav_signout", use_container_width=True):
-        st.session_state["authed"] = False
-        safe_rerun()
-
-
-# ===========================================================================
+# ---------------------------------------------------------------------------
 # AUTH GATE — Unified Login Card inside centered column
-# ===========================================================================
+# ---------------------------------------------------------------------------
 def require_password() -> None:
     if st.session_state.get("authed"):
         return
@@ -1833,6 +1647,138 @@ def require_password() -> None:
 
 
 require_password()
+
+
+# ---------------------------------------------------------------------------
+# EXECUTIVE TOP NAVIGATION BAR
+# ---------------------------------------------------------------------------
+def render_top_nav():
+    """Render the executive top navigation bar and horizontal page tabs."""
+    # Top Header Bar
+    st.markdown(
+        f"""
+        <div class="executive-top-bar">
+            <div class="executive-top-bar-left">
+                <div class="executive-brand">
+                    <span class="executive-brand-icon">⚡</span>
+                    <div>
+                        <div class="executive-brand-text">RISHI-OS // EXECUTIVE CONSOLE</div>
+                        <div class="executive-brand-sub">Zero AI • Zero Agent Execution</div>
+                    </div>
+                </div>
+            </div>
+            <div class="executive-top-bar-right">
+                <div class="executive-status-pill {'conn-ok' if bool(_SUPABASE_URL and _SUPABASE_KEY and not _SUPABASE_URL.startswith('https://your-project')) else 'conn-warn'}">
+                    {'🟢 ONLINE' if bool(_SUPABASE_URL and _SUPABASE_KEY and not _SUPABASE_URL.startswith('https://your-project')) else '🟡 LOCAL SYNC'}
+                </div>
+            </div>
+        </div>
+        <div class="executive-nav-strip">
+        """,
+        unsafe_allow_html=True,
+    )
+    
+    # Horizontal page navigation
+    nav_cols = st.columns(4)
+    page_keys = [p[0] for p in PAGES]
+    page_labels = [p[1] for p in PAGES]
+    
+    for i, (key, label) in enumerate(PAGES):
+        with nav_cols[i]:
+            active = st.session_state.active_page == key
+            if st.button(
+                label, 
+                key=f"nav_{key}", 
+                use_container_width=True, 
+                type="primary" if active else "secondary"
+            ):
+                st.session_state.active_page = key
+                safe_rerun()
+    
+    st.markdown('</div>', unsafe_allow_html=True)
+
+
+# ---------------------------------------------------------------------------
+# Helpers — plain code only
+# ---------------------------------------------------------------------------
+def to_frame(rows: list[dict], columns: list[str] | None = None) -> pd.DataFrame:
+    frame = pd.DataFrame(rows or [])
+    if columns and not frame.empty:
+        keep = [c for c in columns if c in frame.columns]
+        frame = frame[keep]
+    return frame
+
+
+def set_output_status(output_id: str, status: str) -> None:
+    safe_update("outputs", "id", output_id, {"status": status})
+
+
+def update_output_text(output_id: str, clean: str) -> None:
+    safe_update("outputs", "id", output_id, {"clean": clean, "hash": db.content_hash(clean)})
+
+
+def upsert_agent(name: str, enabled: bool, daily_cap: int) -> None:
+    safe_upsert("agents", {"name": name, "enabled": enabled, "daily_cap": int(daily_cap)}, "name")
+
+
+def upsert_brand(key: str, name: str, voice: str, audience: str, platforms: str, always: str, never: str) -> None:
+    safe_upsert("brands", {"key": key, "name": name, "voice": voice, "audience": audience, "platforms": platforms, "always": always, "never": never}, "key")
+
+
+def upsert_note(body: str, brand: str | None, kind: str) -> dict | None:
+    row = {"body": body.strip(), "brand": brand, "kind": kind, "created_at": datetime.utcnow().isoformat()}
+    return safe_insert("notes", row)
+
+
+def upsert_task(agent: str, payload: dict, status: str = "queued") -> dict | None:
+    row = {"agent": agent, "payload": payload, "status": status, "created_at": datetime.utcnow().isoformat()}
+    return safe_insert("tasks", row)
+
+
+def tag_html(status: str) -> str:
+    cls = f"tag-{status}" if status in (
+        "draft", "needs_review", "approved", "rejected", "failed", "skipped", "armed", "standby", "queued", "done"
+    ) else "tag-draft"
+    label = status.replace("_", " ").title()
+    return f'<span class="tag {cls}">{label}</span>'
+
+
+def safe_rerun() -> None:
+    try:
+        st.rerun()
+    except Exception:
+        st.experimental_rerun()
+
+
+# ---------------------------------------------------------------------------
+# Data fetch helpers using safe layer (ZERO st.error)
+# ---------------------------------------------------------------------------
+def fetch_agents() -> list[dict]:
+    agents = safe_select("agents", order="name")
+    if not agents:
+        for a in DEFAULT_AGENTS:
+            a = dict(a)
+            a.setdefault("id", f"local-{a['name']}")
+            a.setdefault("created_at", datetime.utcnow().isoformat())
+        return DEFAULT_AGENTS[:]
+    return agents
+
+
+def fetch_brands() -> list[dict]:
+    brands = safe_select("brands", order="key")
+    if not brands:
+        for b in DEFAULT_BRANDS:
+            b = dict(b)
+            b.setdefault("id", f"local-{b['key']}")
+            b.setdefault("created_at", datetime.utcnow().isoformat())
+        return DEFAULT_BRANDS[:]
+    return brands
+
+
+# ---------------------------------------------------------------------------
+# Top Navigation
+# ---------------------------------------------------------------------------
+render_top_nav()
 
 
 # ===========================================================================
@@ -1889,7 +1835,7 @@ def render_command_center() -> None:
 
     st.divider()
 
-    # ---- Visual Pipeline Stepper (FIX 3: Single HTML string) ----
+    # ---- Visual Pipeline Stepper ----
     pipeline_agents = [
         ("Research", "research_agent"),
         ("Strategist", "idea_strategist"),
@@ -1983,7 +1929,7 @@ def render_command_center() -> None:
     with right:
         with st.container(border=True):
             # Task Dispatch Studio marker for CSS light card styling
-            st.markdown('<div class="task-dispatch-marker"></div>', unsafe_allow_html=True)
+            st.markdown('<div class="light-panel-marker"></div>', unsafe_allow_html=True)
             st.markdown("### Task Dispatch Studio")
             st.caption("Queue a natural-language instruction for any agent. Brand links the task to a voice profile.")
 
@@ -2042,14 +1988,14 @@ def render_command_center() -> None:
                                     status.update(label="Timed out (180s).", state="error")
                                 except Exception as exc:
                                     status.update(label=f"Error: {exc}", state="error")
-                        safe_rerun()
+                                safe_rerun()
 
         st.divider()
 
         # ---- Active Task Queue ----
         with st.container(border=True):
             # Task Queue marker for CSS light card styling
-            st.markdown('<div class="task-queue-marker"></div>', unsafe_allow_html=True)
+            st.markdown('<div class="light-panel-marker"></div>', unsafe_allow_html=True)
             st.markdown("### Active Task Queue")
             tasks_q = safe_select("tasks", eq={"status": "queued"}, order="created_at", limit=20)
             if not tasks_q:
@@ -2451,14 +2397,14 @@ def render_analytics_ledger() -> None:
 # ===========================================================================
 # Router
 # ===========================================================================
-if st.session_state.page == "command_center":
+if st.session_state.active_page == "command_center":
     render_command_center()
-elif st.session_state.page == "review_inbox":
+elif st.session_state.active_page == "review_inbox":
     render_review_inbox()
-elif st.session_state.page == "creative_studio":
+elif st.session_state.active_page == "creative_studio":
     render_creative_studio()
-elif st.session_state.page == "analytics_ledger":
+elif st.session_state.active_page == "analytics_ledger":
     render_analytics_ledger()
 else:
-    st.session_state.page = "command_center"
+    st.session_state.active_page = "command_center"
     safe_rerun()
