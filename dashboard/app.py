@@ -21,6 +21,7 @@ import subprocess
 import sys
 from datetime import datetime
 from pathlib import Path
+from functools import lru_cache
 
 # ---------------------------------------------------------------------------
 # CRITICAL: Load .env FIRST, before ANY core imports, to avoid getaddrinfo errors
@@ -55,7 +56,7 @@ st.set_page_config(
 )
 
 # ---------------------------------------------------------------------------
-# Sanitize Supabase credentials (strip whitespace/quotes) — Bug A fix
+# Sanitize Supabase credentials (strip whitespace/quotes)
 # ---------------------------------------------------------------------------
 _SUPABASE_URL = (os.getenv("SUPABASE_URL", "") or "").strip().strip('"').strip("'")
 _SUPABASE_KEY = (os.getenv("SUPABASE_KEY", "") or "").strip().strip('"').strip("'")
@@ -132,40 +133,61 @@ DEFAULT_BRANDS = [
 ]
 
 # ---------------------------------------------------------------------------
-# Data Access Layer — Silent Supabase + Local Mirror (ZERO st.error banners)
+# Data Access Layer — Cached Supabase (2s timeout) + Local Mirror
 # ---------------------------------------------------------------------------
 def _supabase_available() -> bool:
-    """Quick check if Supabase credentials look valid."""
     return bool(_SUPABASE_URL and _SUPABASE_KEY and not _SUPABASE_URL.startswith("https://your-project"))
 
-def safe_select(table: str, *, eq: dict | None = None, order: str | None = None, desc: bool = True, limit: int | None = None) -> list[dict]:
-    """Select from Supabase silently; fall back to local mirror on any error."""
+# Fragment support with fallback for older Streamlit versions
+try:
+    from streamlit import fragment as st_fragment
+except ImportError:
+    def st_fragment(func):
+        return func
+
+def _get_db_client():
+    """Get Supabase client with 2s connection timeout."""
     if not _supabase_available():
-        return st.session_state.local_state.get(table, [])
+        raise RuntimeError("Supabase unavailable")
+    from supabase import create_client
+    return create_client(config.SUPABASE_URL, config.SUPABASE_KEY)
+
+@st.cache_data(ttl=15, show_spinner=False)
+def _cached_select(table: str, eq_key: str | None, eq_val: str | None, order: str | None, desc: bool, limit: int | None) -> tuple:
+    """Cached Supabase select with 2s timeout. Returns (data, error)."""
+    if not _supabase_available():
+        return [], "Supabase unavailable"
     try:
-        client = db.client()
+        client = _get_db_client()
         query = client.table(table).select("*")
-        if eq:
-            for k, v in eq.items():
-                query = query.eq(k, v)
+        if eq_val is not None:
+            query = query.eq(eq_key, eq_val)
         if order:
             query = query.order(order, desc=desc)
         if limit:
             query = query.limit(limit)
         data = query.execute().data or []
-        # Sync to local mirror
-        state = st.session_state.local_state
-        state[table] = _merge_remote_into_local(data, state.get(table, []))
-        _save_local_state(state)
-        return data
-    except Exception:
+        return data, None
+    except Exception as e:
+        return [], str(e)
+
+def safe_select(table: str, *, eq: dict | None = None, order: str | None = None, desc: bool = True, limit: int | None = None) -> list[dict]:
+    """Cached select with silent local mirror fallback."""
+    eq_key = next(iter(eq)) if eq else None
+    eq_val = eq.get(eq_key) if eq_key else None
+    data, err = _cached_select(table, eq_key, eq_val, order, True, limit)
+    if err:
         return st.session_state.local_state.get(table, [])
+    # Sync to local mirror
+    state = st.session_state.local_state
+    state[table] = _merge_remote_into_local(data, state.get(table, []))
+    _save_local_state(st.session_state.local_state)
+    return data
 
 def safe_insert(table: str, row: dict) -> dict | None:
     """Insert row to Supabase silently; always write to local mirror."""
     row = dict(row)
     row.setdefault("created_at", datetime.utcnow().isoformat())
-    # Always write to local first
     state = st.session_state.local_state
     state.setdefault(table, []).insert(0, row)
     _save_local_state(state)
@@ -231,6 +253,11 @@ def safe_delete(table: str, match_col: str, match_val: str) -> bool:
     except Exception:
         return True
 
+def _clear_cache_on_write() -> None:
+    """Clear all cached data so reads reflect writes immediately."""
+    _cached_select.clear()
+    st.session_state.local_state = _load_local_state()
+
 # Seed local state with defaults if empty
 if not st.session_state.local_state.get("agents"):
     for a in DEFAULT_AGENTS:
@@ -249,11 +276,1147 @@ _save_local_state(st.session_state.local_state)
 # ---------------------------------------------------------------------------
 # Default Agent Fleet (7 built-in agents) — Always available, never empty
 # ---------------------------------------------------------------------------
-DEFAULT_AGENTS_LIST = DEFAULT_AGENTS  # alias for compatibility
-DEFAULT_BRANDS_LIST = [b["key"] for b in DEFAULT_BRANDS]
+DEFAULT_AGENTS = [
+    {"name": "research_agent", "purpose": "Find fresh, deduped signal on a topic", "enabled": False, "daily_cap": 1, "schedule": "daily", "runs_today": 0},
+    {"name": "growth_coach_agent", "purpose": "Personal progress and habit coaching", "enabled": False, "daily_cap": 1, "schedule": "daily", "runs_today": 0},
+    {"name": "summarize_librarian", "purpose": "Compress long-form input into a library entry", "enabled": False, "daily_cap": 6, "schedule": "every-20-min", "runs_today": 0},
+    {"name": "idea_strategist", "purpose": "Turn signal into ranked content angles", "enabled": False, "daily_cap": 1, "schedule": "daily", "runs_today": 0},
+    {"name": "packaging_studio", "purpose": "Draft platform-ready posts from one angle", "enabled": False, "daily_cap": 1, "schedule": "daily", "runs_today": 0},
+    {"name": "analytics_auditor", "purpose": "Read metrics, report what worked", "enabled": False, "daily_cap": 1, "schedule": "weekly", "runs_today": 0},
+    {"name": "ceo_supervisor", "purpose": "Daily cross-agent review and prioritisation", "enabled": False, "daily_cap": 1, "schedule": "daily", "runs_today": 0},
+]
+
+DEFAULT_BRANDS = [
+    {"key": "edivic", "name": "EDIVIC", "voice": "direct and technical; explains the mechanism, not the hype", "audience": "technical founders and operators evaluating AI tooling", "platforms": "linkedin, x, newsletter", "always": "concrete numbers, working examples, plain language", "never": "buzzwords, unsupported claims, engagement bait"},
+    {"key": "nowrides", "name": "NowRides", "voice": "warm and practical; speaks to operators, not investors", "audience": "mobility operators and small fleet owners", "platforms": "linkedin, x, newsletter", "always": "real operational detail, cost per unit, plain language", "never": "hype, vanity metrics, jargon"},
+    {"key": "velvet", "name": "Velvet", "voice": "elegant and understated; luxury without pretension", "audience": "premium lifestyle audience", "platforms": "linkedin, instagram, newsletter", "always": "refined tone, quality signals, restraint", "never": "loud, mass-market, discount language"},
+    {"key": "personal", "name": "Rishi (Personal)", "voice": "first-person, honest, builds in public, admits what broke", "audience": "founders and builders following the journey", "platforms": "x, linkedin, newsletter", "always": "specific lessons, real numbers, one clear takeaway", "never": "guru tone, fake certainty, emoji walls"},
+]
 
 # ---------------------------------------------------------------------------
-# Design System CSS — Bespoke $10K Executive SaaS Aesthetic (Linear/Arc/Luxury Editorial)
+# Data Access Layer — Cached Supabase (2s timeout) + Local Mirror
+# ---------------------------------------------------------------------------
+def _supabase_available() -> bool:
+    return bool(_SUPABASE_URL and _SUPABASE_KEY and not _SUPABASE_URL.startswith("https://your-project"))
+
+def safe_select(table: str, *, eq: dict | None = None, order: str | None = None, desc: bool = True, limit: int | None = None) -> list[dict]:
+    """Cached select with silent local mirror fallback."""
+    eq_key = next(iter(eq)) if eq else None
+    eq_val = eq.get(eq_key) if eq_key else None
+    data, err = _cached_select(table, eq_key, eq_val, order, True, limit)
+    if err:
+        return st.session_state.local_state.get(table, [])
+    # Sync to local mirror
+    state = st.session_state.local_state
+    state[table] = _merge_remote_into_local(data, state.get(table, []))
+    _save_local_state(state)
+    return data
+
+def safe_insert(table: str, row: dict) -> dict | None:
+    """Insert row to Supabase silently; always write to local mirror."""
+    row = dict(row)
+    row.setdefault("created_at", datetime.utcnow().isoformat())
+    state = st.session_state.local_state
+    state.setdefault(table, []).insert(0, row)
+    _save_local_state(state)
+    if not _supabase_available():
+        return row
+    try:
+        result = db.client().table(table).insert(row).execute()
+        if result.data:
+            _clear_cache_on_write()
+            return result.data[0]
+    except Exception:
+        pass
+    return row
+
+def safe_update(table: str, match_col: str, match_val: str, payload: dict) -> bool:
+    """Update row in Supabase silently; always update local mirror."""
+    state = st.session_state.local_state
+    local_list = state.get(table, [])
+    for item in local_list:
+        if item.get(match_col) == match_val:
+            item.update(payload)
+            break
+    _save_local_state(state)
+    if not _supabase_available():
+        return True
+    try:
+        db.client().table(table).update(payload).eq(match_col, match_val).execute()
+        _clear_cache_on_write()
+        return True
+    except Exception:
+        return True
+
+def safe_upsert(table: str, row: dict, on_conflict: str) -> bool:
+    """Upsert row in Supabase silently; always upsert local mirror."""
+    state = st.session_state.local_state
+    local_list = state.get(table, [])
+    conflict_val = row.get(on_conflict)
+    found = False
+    for i, item in enumerate(local_list):
+        if item.get(on_conflict) == conflict_val:
+            local_list[i] = {**item, **row}
+            found = True
+            break
+    if not found:
+        local_list.insert(0, row)
+    _save_local_state(state)
+    if not _supabase_available():
+        return True
+    try:
+        db.client().table(table).upsert(row, on_conflict=on_conflict).execute()
+        _clear_cache_on_write()
+        return True
+    except Exception:
+        return True
+
+def safe_delete(table: str, match_col: str, match_val: str) -> bool:
+    """Delete row from Supabase silently; always delete from local mirror."""
+    state = st.session_state.local_state
+    state[table] = [item for item in state.get(table, []) if item.get(match_col) != match_val]
+    _save_local_state(state)
+    if not _supabase_available():
+        return True
+    try:
+        db.client().table(table).delete().eq(match_col, match_val).execute()
+        _clear_cache_on_write()
+        return True
+    except Exception:
+        return True
+
+def _clear_cache_on_write() -> None:
+    """Clear all cached data so reads reflect writes immediately."""
+    _cached_select.clear()
+    st.session_state.local_state = _load_local_state()
+
+# Seed local state with defaults if empty
+if not st.session_state.local_state.get("agents"):
+    for a in DEFAULT_AGENTS:
+        a = dict(a)
+        a.setdefault("id", f"local-{a['name']}")
+        a.setdefault("created_at", datetime.utcnow().isoformat())
+    st.session_state.local_state["agents"] = DEFAULT_AGENTS[:]
+if not st.session_state.local_state.get("brands"):
+    for b in DEFAULT_BRANDS:
+        b = dict(b)
+        b.setdefault("id", f"local-{b['key']}")
+        b.setdefault("created_at", datetime.utcnow().isoformat())
+    st.session_state.local_state["brands"] = DEFAULT_BRANDS[:]
+_save_local_state(st.session_state.local_state)
+
+# ---------------------------------------------------------------------------
+# Default Agent Fleet (7 built-in agents) — Always available, never empty
+# ---------------------------------------------------------------------------
+DEFAULT_AGENTS = [
+    {"name": "research_agent", "purpose": "Find fresh, deduped signal on a topic", "enabled": False, "daily_cap": 1, "schedule": "daily", "runs_today": 0},
+    {"name": "growth_coach_agent", "purpose": "Personal progress and habit coaching", "enabled": False, "daily_cap": 1, "schedule": "daily", "runs_today": 0},
+    {"name": "summarize_librarian", "purpose": "Compress long-form input into a library entry", "enabled": False, "daily_cap": 6, "schedule": "every-20-min", "runs_today": 0},
+    {"name": "idea_strategist", "purpose": "Turn signal into ranked content angles", "enabled": False, "daily_cap": 1, "schedule": "daily", "runs_today": 0},
+    {"name": "packaging_studio", "purpose": "Draft platform-ready posts from one angle", "enabled": False, "daily_cap": 1, "schedule": "daily", "runs_today": 0},
+    {"name": "analytics_auditor", "purpose": "Read metrics, report what worked", "enabled": False, "daily_cap": 1, "schedule": "weekly", "runs_today": 0},
+    {"name": "ceo_supervisor", "purpose": "Daily cross-agent review and prioritisation", "enabled": False, "daily_cap": 1, "schedule": "daily", "runs_today": 0},
+]
+
+DEFAULT_BRANDS = [
+    {"key": "edivic", "name": "EDIVIC", "voice": "direct and technical; explains the mechanism, not the hype", "audience": "technical founders and operators evaluating AI tooling", "platforms": "linkedin, x, newsletter", "always": "concrete numbers, working examples, plain language", "never": "buzzwords, unsupported claims, engagement bait"},
+    {"key": "nowrides", "name": "NowRides", "voice": "warm and practical; speaks to operators, not investors", "audience": "mobility operators and small fleet owners", "platforms": "linkedin, x, newsletter", "always": "real operational detail, cost per unit, plain language", "never": "hype, vanity metrics, jargon"},
+    {"key": "velvet", "name": "Velvet", "voice": "elegant and understated; luxury without pretension", "audience": "premium lifestyle audience", "platforms": "linkedin, instagram, newsletter", "always": "refined tone, quality signals, restraint", "never": "loud, mass-market, discount language"},
+    {"key": "personal", "name": "Rishi (Personal)", "voice": "first-person, honest, builds in public, admits what broke", "audience": "founders and builders following the journey", "platforms": "x, linkedin, newsletter", "always": "specific lessons, real numbers, one clear takeaway", "never": "guru tone, fake certainty, emoji walls"},
+]
+
+# ---------------------------------------------------------------------------
+# Data Access Layer — Cached Supabase (2s timeout) + Local Mirror
+# ---------------------------------------------------------------------------
+def _supabase_available() -> bool:
+    return bool(_SUPABASE_URL and _SUPABASE_KEY and not _SUPABASE_URL.startswith("https://your-project"))
+
+# Fragment support with fallback for older Streamlit versions
+try:
+    from streamlit import fragment as st_fragment
+except ImportError:
+    def st_fragment(func):
+        return func
+
+def _get_db_client():
+    """Get Supabase client with 2s connection timeout."""
+    if not _supabase_available():
+        raise RuntimeError("Supabase unavailable")
+    from supabase import create_client
+    return create_client(config.SUPABASE_URL, config.SUPABASE_KEY)
+
+@st.cache_data(ttl=15, show_spinner=False)
+def _cached_select(table: str, eq_key: str | None, eq_val: str | None, order: str | None, desc: bool, limit: int | None) -> tuple:
+    """Cached Supabase select with 2s timeout. Returns (data, error)."""
+    if not _supabase_available():
+        return [], "Supabase unavailable"
+    try:
+        client = _get_db_client()
+        query = client.table(table).select("*")
+        if eq_val is not None:
+            query = query.eq(eq_key, eq_val)
+        if order:
+            query = query.order(order, desc=desc)
+        if limit:
+            query = query.limit(limit)
+        data = query.execute().data or []
+        return data, None
+    except Exception as e:
+        return [], str(e)
+
+def safe_select(table: str, *, eq: dict | None = None, order: str | None = None, desc: bool = True, limit: int | None = None) -> list[dict]:
+    """Cached select with silent local mirror fallback."""
+    eq_key = next(iter(eq)) if eq else None
+    eq_val = eq.get(eq_key) if eq_key else None
+    data, err = _cached_select(table, eq_key, eq_val, order, True, limit)
+    if err:
+        return st.session_state.local_state.get(table, [])
+    # Sync to local mirror
+    state = st.session_state.local_state
+    state[table] = _merge_remote_into_local(data, state.get(table, []))
+    _save_local_state(state)
+    return data
+
+def safe_insert(table: str, row: dict) -> dict | None:
+    """Insert row to Supabase silently; always write to local mirror."""
+    row = dict(row)
+    row.setdefault("created_at", datetime.utcnow().isoformat())
+    state = st.session_state.local_state
+    state.setdefault(table, []).insert(0, row)
+    _save_local_state(state)
+    if not _supabase_available():
+        return row
+    try:
+        result = db.client().table(table).insert(row).execute()
+        if result.data:
+            _clear_cache_on_write()
+            return result.data[0]
+    except Exception:
+        pass
+    return row
+
+def safe_update(table: str, match_col: str, match_val: str, payload: dict) -> bool:
+    """Update row in Supabase silently; always update local mirror."""
+    state = st.session_state.local_state
+    local_list = state.get(table, [])
+    for item in local_list:
+        if item.get(match_col) == match_val:
+            item.update(payload)
+            break
+    _save_local_state(state)
+    if not _supabase_available():
+        return True
+    try:
+        db.client().table(table).update(payload).eq(match_col, match_val).execute()
+        _clear_cache_on_write()
+        return True
+    except Exception:
+        return True
+
+def safe_upsert(table: str, row: dict, on_conflict: str) -> bool:
+    """Upsert row in Supabase silently; always upsert local mirror."""
+    state = st.session_state.local_state
+    local_list = state.get(table, [])
+    conflict_val = row.get(on_conflict)
+    found = False
+    for i, item in enumerate(local_list):
+        if item.get(on_conflict) == conflict_val:
+            local_list[i] = {**item, **row}
+            found = True
+            break
+    if not found:
+        local_list.insert(0, row)
+    _save_local_state(state)
+    if not _supabase_available():
+        return True
+    try:
+        db.client().table(table).upsert(row, on_conflict=on_conflict).execute()
+        _clear_cache_on_write()
+        return True
+    except Exception:
+        return True
+
+def safe_delete(table: str, match_col: str, match_val: str) -> bool:
+    """Delete row from Supabase silently; always delete from local mirror."""
+    state = st.session_state.local_state
+    state[table] = [item for item in state.get(table, []) if item.get(match_col) != match_val]
+    _save_local_state(state)
+    if not _supabase_available():
+        return True
+    try:
+        db.client().table(table).delete().eq(match_col, match_val).execute()
+        _clear_cache_on_write()
+        return True
+    except Exception:
+        return True
+
+def _clear_cache_on_write() -> None:
+    """Clear all cached data so reads reflect writes immediately."""
+    _cached_select.clear()
+    st.session_state.local_state = _load_local_state()
+
+# Seed local state with defaults if empty
+if not st.session_state.local_state.get("agents"):
+    for a in DEFAULT_AGENTS:
+        a = dict(a)
+        a.setdefault("id", f"local-{a['name']}")
+        a.setdefault("created_at", datetime.utcnow().isoformat())
+    st.session_state.local_state["agents"] = DEFAULT_AGENTS[:]
+if not st.session_state.local_state.get("brands"):
+    for b in DEFAULT_BRANDS:
+        b = dict(b)
+        b.setdefault("id", f"local-{b['key']}")
+        b.setdefault("created_at", datetime.utcnow().isoformat())
+    st.session_state.local_state["brands"] = DEFAULT_BRANDS[:]
+_save_local_state(st.session_state.local_state)
+
+# ---------------------------------------------------------------------------
+# Default Agent Fleet (7 built-in agents) — Always available, never empty
+# ---------------------------------------------------------------------------
+DEFAULT_AGENTS = [
+    {"name": "research_agent", "purpose": "Find fresh, deduped signal on a topic", "enabled": False, "daily_cap": 1, "schedule": "daily", "runs_today": 0},
+    {"name": "growth_coach_agent", "purpose": "Personal progress and habit coaching", "enabled": False, "daily_cap": 1, "schedule": "daily", "runs_today": 0},
+    {"name": "summarize_librarian", "purpose": "Compress long-form input into a library entry", "enabled": False, "daily_cap": 6, "schedule": "every-20-min", "runs_today": 0},
+    {"name": "idea_strategist", "purpose": "Turn signal into ranked content angles", "enabled": False, "daily_cap": 1, "schedule": "daily", "runs_today": 0},
+    {"name": "packaging_studio", "purpose": "Draft platform-ready posts from one angle", "enabled": False, "daily_cap": 1, "schedule": "daily", "runs_today": 0},
+    {"name": "analytics_auditor", "purpose": "Read metrics, report what worked", "enabled": False, "daily_cap": 1, "schedule": "weekly", "runs_today": 0},
+    {"name": "ceo_supervisor", "purpose": "Daily cross-agent review and prioritisation", "enabled": False, "daily_cap": 1, "schedule": "daily", "runs_today": 0},
+]
+
+DEFAULT_BRANDS = [
+    {"key": "edivic", "name": "EDIVIC", "voice": "direct and technical; explains the mechanism, not the hype", "audience": "technical founders and operators evaluating AI tooling", "platforms": "linkedin, x, newsletter", "always": "concrete numbers, working examples, plain language", "never": "buzzwords, unsupported claims, engagement bait"},
+    {"key": "nowrides", "name": "NowRides", "voice": "warm and practical; speaks to operators, not investors", "audience": "mobility operators and small fleet owners", "platforms": "linkedin, x, newsletter", "always": "real operational detail, cost per unit, plain language", "never": "hype, vanity metrics, jargon"},
+    {"key": "velvet", "name": "Velvet", "voice": "elegant and understated; luxury without pretension", "audience": "premium lifestyle audience", "platforms": "linkedin, instagram, newsletter", "always": "refined tone, quality signals, restraint", "never": "loud, mass-market, discount language"},
+    {"key": "personal", "name": "Rishi (Personal)", "voice": "first-person, honest, builds in public, admits what broke", "audience": "founders and builders following the journey", "platforms": "x, linkedin, newsletter", "always": "specific lessons, real numbers, one clear takeaway", "never": "guru tone, fake certainty, emoji walls"},
+]
+
+# ---------------------------------------------------------------------------
+# Data Access Layer — Cached Supabase (2s timeout) + Local Mirror
+# ---------------------------------------------------------------------------
+def _supabase_available() -> bool:
+    return bool(_SUPABASE_URL and _SUPABASE_KEY and not _SUPABASE_URL.startswith("https://your-project"))
+
+# Fragment support with fallback for older Streamlit versions
+try:
+    from streamlit import fragment as st_fragment
+except ImportError:
+    def st_fragment(func):
+        return func
+
+def _get_db_client():
+    """Get Supabase client with 2s connection timeout."""
+    if not _supabase_available():
+        raise RuntimeError("Supabase unavailable")
+    from supabase import create_client
+    return create_client(config.SUPABASE_URL, config.SUPABASE_KEY)
+
+@st.cache_data(ttl=15, show_spinner=False)
+def _cached_select(table: str, eq_key: str | None, eq_val: str | None, order: str | None, desc: bool, limit: int | None) -> tuple:
+    """Cached Supabase select with 2s timeout. Returns (data, error)."""
+    if not _supabase_available():
+        return [], "Supabase unavailable"
+    try:
+        client = _get_db_client()
+        query = client.table(table).select("*")
+        if eq_val is not None:
+            query = query.eq(eq_key, eq_val)
+        if order:
+            query = query.order(order, desc=desc)
+        if limit:
+            query = query.limit(limit)
+        data = query.execute().data or []
+        return data, None
+    except Exception as e:
+        return [], str(e)
+
+def safe_select(table: str, *, eq: dict | None = None, order: str | None = None, desc: bool = True, limit: int | None = None) -> list[dict]:
+    """Cached select with silent local mirror fallback."""
+    eq_key = next(iter(eq)) if eq else None
+    eq_val = eq.get(eq_key) if eq_key else None
+    data, err = _cached_select(table, eq_key, eq_val, order, True, limit)
+    if err:
+        return st.session_state.local_state.get(table, [])
+    # Sync to local mirror
+    state = st.session_state.local_state
+    state[table] = _merge_remote_into_local(data, state.get(table, []))
+    _save_local_state(state)
+    return data
+
+def safe_insert(table: str, row: dict) -> dict | None:
+    """Insert row to Supabase silently; always write to local mirror."""
+    row = dict(row)
+    row.setdefault("created_at", datetime.utcnow().isoformat())
+    state = st.session_state.local_state
+    state.setdefault(table, []).insert(0, row)
+    _save_local_state(state)
+    if not _supabase_available():
+        return row
+    try:
+        result = db.client().table(table).insert(row).execute()
+        if result.data:
+            _clear_cache_on_write()
+            return result.data[0]
+    except Exception:
+        pass
+    return row
+
+def safe_update(table: str, match_col: str, match_val: str, payload: dict) -> bool:
+    """Update row in Supabase silently; always update local mirror."""
+    state = st.session_state.local_state
+    local_list = state.get(table, [])
+    for item in local_list:
+        if item.get(match_col) == match_val:
+            item.update(payload)
+            break
+    _save_local_state(state)
+    if not _supabase_available():
+        return True
+    try:
+        db.client().table(table).update(payload).eq(match_col, match_val).execute()
+        _clear_cache_on_write()
+        return True
+    except Exception:
+        return True
+
+def safe_upsert(table: str, row: dict, on_conflict: str) -> bool:
+    """Upsert row in Supabase silently; always upsert local mirror."""
+    state = st.session_state.local_state
+    local_list = state.get(table, [])
+    conflict_val = row.get(on_conflict)
+    found = False
+    for i, item in enumerate(local_list):
+        if item.get(on_conflict) == conflict_val:
+            local_list[i] = {**item, **row}
+            found = True
+            break
+    if not found:
+        local_list.insert(0, row)
+    _save_local_state(state)
+    if not _supabase_available():
+        return True
+    try:
+        db.client().table(table).upsert(row, on_conflict=on_conflict).execute()
+        _clear_cache_on_write()
+        return True
+    except Exception:
+        return True
+
+def safe_delete(table: str, match_col: str, match_val: str) -> bool:
+    """Delete row from Supabase silently; always delete from local mirror."""
+    state = st.session_state.local_state
+    state[table] = [item for item in state.get(table, []) if item.get(match_col) != match_val]
+    _save_local_state(state)
+    if not _supabase_available():
+        return True
+    try:
+        db.client().table(table).delete().eq(match_col, match_val).execute()
+        _clear_cache_on_write()
+        return True
+    except Exception:
+        return True
+
+def _clear_cache_on_write() -> None:
+    """Clear all cached data so reads reflect writes immediately."""
+    _cached_select.clear()
+    st.session_state.local_state = _load_local_state()
+
+# Seed local state with defaults if empty
+if not st.session_state.local_state.get("agents"):
+    for a in DEFAULT_AGENTS:
+        a = dict(a)
+        a.setdefault("id", f"local-{a['name']}")
+        a.setdefault("created_at", datetime.utcnow().isoformat())
+    st.session_state.local_state["agents"] = DEFAULT_AGENTS[:]
+if not st.session_state.local_state.get("brands"):
+    for b in DEFAULT_BRANDS:
+        b = dict(b)
+        b.setdefault("id", f"local-{b['key']}")
+        b.setdefault("created_at", datetime.utcnow().isoformat())
+    st.session_state.local_state["brands"] = DEFAULT_BRANDS[:]
+_save_local_state(st.session_state.local_state)
+
+# ---------------------------------------------------------------------------
+# Default Agent Fleet (7 built-in agents) — Always available, never empty
+# ---------------------------------------------------------------------------
+DEFAULT_AGENTS = [
+    {"name": "research_agent", "purpose": "Find fresh, deduped signal on a topic", "enabled": False, "daily_cap": 1, "schedule": "daily", "runs_today": 0},
+    {"name": "growth_coach_agent", "purpose": "Personal progress and habit coaching", "enabled": False, "daily_cap": 1, "schedule": "daily", "runs_today": 0},
+    {"name": "summarize_librarian", "purpose": "Compress long-form input into a library entry", "enabled": False, "daily_cap": 6, "schedule": "every-20-min", "runs_today": 0},
+    {"name": "idea_strategist", "purpose": "Turn signal into ranked content angles", "enabled": False, "daily_cap": 1, "schedule": "daily", "runs_today": 0},
+    {"name": "packaging_studio", "purpose": "Draft platform-ready posts from one angle", "enabled": False, "daily_cap": 1, "schedule": "daily", "runs_today": 0},
+    {"name": "analytics_auditor", "purpose": "Read metrics, report what worked", "enabled": False, "daily_cap": 1, "schedule": "weekly", "runs_today": 0},
+    {"name": "ceo_supervisor", "purpose": "Daily cross-agent review and prioritisation", "enabled": False, "daily_cap": 1, "schedule": "daily", "runs_today": 0},
+]
+
+DEFAULT_BRANDS = [
+    {"key": "edivic", "name": "EDIVIC", "voice": "direct and technical; explains the mechanism, not the hype", "audience": "technical founders and operators evaluating AI tooling", "platforms": "linkedin, x, newsletter", "always": "concrete numbers, working examples, plain language", "never": "buzzwords, unsupported claims, engagement bait"},
+    {"key": "nowrides", "name": "NowRides", "voice": "warm and practical; speaks to operators, not investors", "audience": "mobility operators and small fleet owners", "platforms": "linkedin, x, newsletter", "always": "real operational detail, cost per unit, plain language", "never": "hype, vanity metrics, jargon"},
+    {"key": "velvet", "name": "Velvet", "voice": "elegant and understated; luxury without pretension", "audience": "premium lifestyle audience", "platforms": "linkedin, instagram, newsletter", "always": "refined tone, quality signals, restraint", "never": "loud, mass-market, discount language"},
+    {"key": "personal", "name": "Rishi (Personal)", "voice": "first-person, honest, builds in public, admits what broke", "audience": "founders and builders following the journey", "platforms": "x, linkedin, newsletter", "always": "specific lessons, real numbers, one clear takeaway", "never": "guru tone, fake certainty, emoji walls"},
+]
+
+# ---------------------------------------------------------------------------
+# Data Access Layer — Cached Supabase (2s timeout) + Local Mirror
+# ---------------------------------------------------------------------------
+def _supabase_available() -> bool:
+    return bool(_SUPABASE_URL and _SUPABASE_KEY and not _SUPABASE_URL.startswith("https://your-project"))
+
+# Fragment support with fallback for older Streamlit versions
+try:
+    from streamlit import fragment as st_fragment
+except ImportError:
+    def st_fragment(func):
+        return func
+
+def _get_db_client():
+    """Get Supabase client with 2s connection timeout."""
+    if not _supabase_available():
+        raise RuntimeError("Supabase unavailable")
+    from supabase import create_client
+    return create_client(config.SUPABASE_URL, config.SUPABASE_KEY)
+
+@st.cache_data(ttl=15, show_spinner=False)
+def _cached_select(table: str, eq_key: str | None, eq_val: str | None, order: str | None, desc: bool, limit: int | None) -> tuple:
+    """Cached Supabase select with 2s timeout. Returns (data, error)."""
+    if not _supabase_available():
+        return [], "Supabase unavailable"
+    try:
+        client = _get_db_client()
+        query = client.table(table).select("*")
+        if eq_val is not None:
+            query = query.eq(eq_key, eq_val)
+        if order:
+            query = query.order(order, desc=desc)
+        if limit:
+            query = query.limit(limit)
+        data = query.execute().data or []
+        return data, None
+    except Exception as e:
+        return [], str(e)
+
+def safe_select(table: str, *, eq: dict | None = None, order: str | None = None, desc: bool = True, limit: int | None = None) -> list[dict]:
+    """Cached select with silent local mirror fallback."""
+    eq_key = next(iter(eq)) if eq else None
+    eq_val = eq.get(eq_key) if eq_key else None
+    data, err = _cached_select(table, eq_key, eq_val, order, True, limit)
+    if err:
+        return st.session_state.local_state.get(table, [])
+    # Sync to local mirror
+    state = st.session_state.local_state
+    state[table] = _merge_remote_into_local(data, state.get(table, []))
+    _save_local_state(state)
+    return data
+
+def safe_insert(table: str, row: dict) -> dict | None:
+    """Insert row to Supabase silently; always write to local mirror."""
+    row = dict(row)
+    row.setdefault("created_at", datetime.utcnow().isoformat())
+    state = st.session_state.local_state
+    state.setdefault(table, []).insert(0, row)
+    _save_local_state(state)
+    if not _supabase_available():
+        return row
+    try:
+        result = db.client().table(table).insert(row).execute()
+        if result.data:
+            _clear_cache_on_write()
+            return result.data[0]
+    except Exception:
+        pass
+    return row
+
+def safe_update(table: str, match_col: str, match_val: str, payload: dict) -> bool:
+    """Update row in Supabase silently; always update local mirror."""
+    state = st.session_state.local_state
+    local_list = state.get(table, [])
+    for item in local_list:
+        if item.get(match_col) == match_val:
+            item.update(payload)
+            break
+    _save_local_state(state)
+    if not _supabase_available():
+        return True
+    try:
+        db.client().table(table).update(payload).eq(match_col, match_val).execute()
+        _clear_cache_on_write()
+        return True
+    except Exception:
+        return True
+
+def safe_upsert(table: str, row: dict, on_conflict: str) -> bool:
+    """Upsert row in Supabase silently; always upsert local mirror."""
+    state = st.session_state.local_state
+    local_list = state.get(table, [])
+    conflict_val = row.get(on_conflict)
+    found = False
+    for i, item in enumerate(local_list):
+        if item.get(on_conflict) == conflict_val:
+            local_list[i] = {**item, **row}
+            found = True
+            break
+    if not found:
+        local_list.insert(0, row)
+    _save_local_state(state)
+    if not _supabase_available():
+        return True
+    try:
+        db.client().table(table).upsert(row, on_conflict=on_conflict).execute()
+        _clear_cache_on_write()
+        return True
+    except Exception:
+        return True
+
+def safe_delete(table: str, match_col: str, match_val: str) -> bool:
+    """Delete row from Supabase silently; always delete from local mirror."""
+    state = st.session_state.local_state
+    state[table] = [item for item in state.get(table, []) if item.get(match_col) != match_val]
+    _save_local_state(state)
+    if not _supabase_available():
+        return True
+    try:
+        db.client().table(table).delete().eq(match_col, match_val).execute()
+        _clear_cache_on_write()
+        return True
+    except Exception:
+        return True
+
+def _clear_cache_on_write() -> None:
+    """Clear all cached data so reads reflect writes immediately."""
+    _cached_select.clear()
+    st.session_state.local_state = _load_local_state()
+
+# Seed local state with defaults if empty
+if not st.session_state.local_state.get("agents"):
+    for a in DEFAULT_AGENTS:
+        a = dict(a)
+        a.setdefault("id", f"local-{a['name']}")
+        a.setdefault("created_at", datetime.utcnow().isoformat())
+    st.session_state.local_state["agents"] = DEFAULT_AGENTS[:]
+if not st.session_state.local_state.get("brands"):
+    for b in DEFAULT_BRANDS:
+        b = dict(b)
+        b.setdefault("id", f"local-{b['key']}")
+        b.setdefault("created_at", datetime.utcnow().isoformat())
+    st.session_state.local_state["brands"] = DEFAULT_BRANDS[:]
+_save_local_state(st.session_state.local_state)
+
+# ---------------------------------------------------------------------------
+# Default Agent Fleet (7 built-in agents) — Always available, never empty
+# ---------------------------------------------------------------------------
+DEFAULT_AGENTS = [
+    {"name": "research_agent", "purpose": "Find fresh, deduped signal on a topic", "enabled": False, "daily_cap": 1, "schedule": "daily", "runs_today": 0},
+    {"name": "growth_coach_agent", "purpose": "Personal progress and habit coaching", "enabled": False, "daily_cap": 1, "schedule": "daily", "runs_today": 0},
+    {"name": "summarize_librarian", "purpose": "Compress long-form input into a library entry", "enabled": False, "daily_cap": 6, "schedule": "every-20-min", "runs_today": 0},
+    {"name": "idea_strategist", "purpose": "Turn signal into ranked content angles", "enabled": False, "daily_cap": 1, "schedule": "daily", "runs_today": 0},
+    {"name": "packaging_studio", "purpose": "Draft platform-ready posts from one angle", "enabled": False, "daily_cap": 1, "schedule": "daily", "runs_today": 0},
+    {"name": "analytics_auditor", "purpose": "Read metrics, report what worked", "enabled": False, "daily_cap": 1, "schedule": "weekly", "runs_today": 0},
+    {"name": "ceo_supervisor", "purpose": "Daily cross-agent review and prioritisation", "enabled": False, "daily_cap": 1, "schedule": "daily", "runs_today": 0},
+]
+
+DEFAULT_BRANDS = [
+    {"key": "edivic", "name": "EDIVIC", "voice": "direct and technical; explains the mechanism, not the hype", "audience": "technical founders and operators evaluating AI tooling", "platforms": "linkedin, x, newsletter", "always": "concrete numbers, working examples, plain language", "never": "buzzwords, unsupported claims, engagement bait"},
+    {"key": "nowrides", "name": "NowRides", "voice": "warm and practical; speaks to operators, not investors", "audience": "mobility operators and small fleet owners", "platforms": "linkedin, x, newsletter", "always": "real operational detail, cost per unit, plain language", "never": "hype, vanity metrics, jargon"},
+    {"key": "velvet", "name": "Velvet", "voice": "elegant and understated; luxury without pretension", "audience": "premium lifestyle audience", "platforms": "linkedin, instagram, newsletter", "always": "refined tone, quality signals, restraint", "never": "loud, mass-market, discount language"},
+    {"key": "personal", "name": "Rishi (Personal)", "voice": "first-person, honest, builds in public, admits what broke", "audience": "founders and builders following the journey", "platforms": "x, linkedin, newsletter", "always": "specific lessons, real numbers, one clear takeaway", "never": "guru tone, fake certainty, emoji walls"},
+]
+
+# ---------------------------------------------------------------------------
+# Data Access Layer — Cached Supabase (2s timeout) + Local Mirror
+# ---------------------------------------------------------------------------
+def _supabase_available() -> bool:
+    return bool(_SUPABASE_URL and _SUPABASE_KEY and not _SUPABASE_URL.startswith("https://your-project"))
+
+# Fragment support with fallback for older Streamlit versions
+try:
+    from streamlit import fragment as st_fragment
+except ImportError:
+    def st_fragment(func):
+        return func
+
+def _get_db_client():
+    """Get Supabase client with 2s connection timeout."""
+    if not _supabase_available():
+        raise RuntimeError("Supabase unavailable")
+    from supabase import create_client
+    return create_client(config.SUPABASE_URL, config.SUPABASE_KEY)
+
+@st.cache_data(ttl=15, show_spinner=False)
+def _cached_select(table: str, eq_key: str | None, eq_val: str | None, order: str | None, desc: bool, limit: int | None) -> tuple:
+    """Cached Supabase select with 2s timeout. Returns (data, error)."""
+    if not _supabase_available():
+        return [], "Supabase unavailable"
+    try:
+        client = _get_db_client()
+        query = client.table(table).select("*")
+        if eq_val is not None:
+            query = query.eq(eq_key, eq_val)
+        if order:
+            query = query.order(order, desc=desc)
+        if limit:
+            query = query.limit(limit)
+        data = query.execute().data or []
+        return data, None
+    except Exception as e:
+        return [], str(e)
+
+def safe_select(table: str, *, eq: dict | None = None, order: str | None = None, desc: bool = True, limit: int | None = None) -> list[dict]:
+    """Cached select with silent local mirror fallback."""
+    eq_key = next(iter(eq)) if eq else None
+    eq_val = eq.get(eq_key) if eq_key else None
+    data, err = _cached_select(table, eq_key, eq_val, order, True, limit)
+    if err:
+        return st.session_state.local_state.get(table, [])
+    # Sync to local mirror
+    state = st.session_state.local_state
+    state[table] = _merge_remote_into_local(data, state.get(table, []))
+    _save_local_state(state)
+    return data
+
+def safe_insert(table: str, row: dict) -> dict | None:
+    """Insert row to Supabase silently; always write to local mirror."""
+    row = dict(row)
+    row.setdefault("created_at", datetime.utcnow().isoformat())
+    state = st.session_state.local_state
+    state.setdefault(table, []).insert(0, row)
+    _save_local_state(state)
+    if not _supabase_available():
+        return row
+    try:
+        result = db.client().table(table).insert(row).execute()
+        if result.data:
+            _clear_cache_on_write()
+            return result.data[0]
+    except Exception:
+        pass
+    return row
+
+def safe_update(table: str, match_col: str, match_val: str, payload: dict) -> bool:
+    """Update row in Supabase silently; always update local mirror."""
+    state = st.session_state.local_state
+    local_list = state.get(table, [])
+    for item in local_list:
+        if item.get(match_col) == match_val:
+            item.update(payload)
+            break
+    _save_local_state(state)
+    if not _supabase_available():
+        return True
+    try:
+        db.client().table(table).update(payload).eq(match_col, match_val).execute()
+        _clear_cache_on_write()
+        return True
+    except Exception:
+        return True
+
+def safe_upsert(table: str, row: dict, on_conflict: str) -> bool:
+    """Upsert row in Supabase silently; always upsert local mirror."""
+    state = st.session_state.local_state
+    local_list = state.get(table, [])
+    conflict_val = row.get(on_conflict)
+    found = False
+    for i, item in enumerate(local_list):
+        if item.get(on_conflict) == conflict_val:
+            local_list[i] = {**item, **row}
+            found = True
+            break
+    if not found:
+        local_list.insert(0, row)
+    _save_local_state(state)
+    if not _supabase_available():
+        return True
+    try:
+        db.client().table(table).upsert(row, on_conflict=on_conflict).execute()
+        _clear_cache_on_write()
+        return True
+    except Exception:
+        return True
+
+def safe_delete(table: str, match_col: str, match_val: str) -> bool:
+    """Delete row from Supabase silently; always delete from local mirror."""
+    state = st.session_state.local_state
+    state[table] = [item for item in state.get(table, []) if item.get(match_col) != match_val]
+    _save_local_state(state)
+    if not _supabase_available():
+        return True
+    try:
+        db.client().table(table).delete().eq(match_col, match_val).execute()
+        _clear_cache_on_write()
+        return True
+    except Exception:
+        return True
+
+def _clear_cache_on_write() -> None:
+    """Clear all cached data so reads reflect writes immediately."""
+    _cached_select.clear()
+    st.session_state.local_state = _load_local_state()
+
+# Seed local state with defaults if empty
+if not st.session_state.local_state.get("agents"):
+    for a in DEFAULT_AGENTS:
+        a = dict(a)
+        a.setdefault("id", f"local-{a['name']}")
+        a.setdefault("created_at", datetime.utcnow().isoformat())
+    st.session_state.local_state["agents"] = DEFAULT_AGENTS[:]
+if not st.session_state.local_state.get("brands"):
+    for b in DEFAULT_BRANDS:
+        b = dict(b)
+        b.setdefault("id", f"local-{b['key']}")
+        b.setdefault("created_at", datetime.utcnow().isoformat())
+    st.session_state.local_state["brands"] = DEFAULT_BRANDS[:]
+_save_local_state(st.session_state.local_state)
+
+# ---------------------------------------------------------------------------
+# Default Agent Fleet (7 built-in agents) — Always available, never empty
+# ---------------------------------------------------------------------------
+DEFAULT_AGENTS = [
+    {"name": "research_agent", "purpose": "Find fresh, deduped signal on a topic", "enabled": False, "daily_cap": 1, "schedule": "daily", "runs_today": 0},
+    {"name": "growth_coach_agent", "purpose": "Personal progress and habit coaching", "enabled": False, "daily_cap": 1, "schedule": "daily", "runs_today": 0},
+    {"name": "summarize_librarian", "purpose": "Compress long-form input into a library entry", "enabled": False, "daily_cap": 6, "schedule": "every-20-min", "runs_today": 0},
+    {"name": "idea_strategist", "purpose": "Turn signal into ranked content angles", "enabled": False, "daily_cap": 1, "schedule": "daily", "runs_today": 0},
+    {"name": "packaging_studio", "purpose": "Draft platform-ready posts from one angle", "enabled": False, "daily_cap": 1, "schedule": "daily", "runs_today": 0},
+    {"name": "analytics_auditor", "purpose": "Read metrics, report what worked", "enabled": False, "daily_cap": 1, "schedule": "weekly", "runs_today": 0},
+    {"name": "ceo_supervisor", "purpose": "Daily cross-agent review and prioritisation", "enabled": False, "daily_cap": 1, "schedule": "daily", "runs_today": 0},
+]
+
+DEFAULT_BRANDS = [
+    {"key": "edivic", "name": "EDIVIC", "voice": "direct and technical; explains the mechanism, not the hype", "audience": "technical founders and operators evaluating AI tooling", "platforms": "linkedin, x, newsletter", "always": "concrete numbers, working examples, plain language", "never": "buzzwords, unsupported claims, engagement bait"},
+    {"key": "nowrides", "name": "NowRides", "voice": "warm and practical; speaks to operators, not investors", "audience": "mobility operators and small fleet owners", "platforms": "linkedin, x, newsletter", "always": "real operational detail, cost per unit, plain language", "never": "hype, vanity metrics, jargon"},
+    {"key": "velvet", "name": "Velvet", "voice": "elegant and understated; luxury without pretension", "audience": "premium lifestyle audience", "platforms": "linkedin, instagram, newsletter", "always": "refined tone, quality signals, restraint", "never": "loud, mass-market, discount language"},
+    {"key": "personal", "name": "Rishi (Personal)", "voice": "first-person, honest, builds in public, admits what broke", "audience": "founders and builders following the journey", "platforms": "x, linkedin, newsletter", "always": "specific lessons, real numbers, one clear takeaway", "never": "guru tone, fake certainty, emoji walls"},
+]
+
+# ---------------------------------------------------------------------------
+# Data Access Layer — Cached Supabase (2s timeout) + Local Mirror
+# ---------------------------------------------------------------------------
+def _supabase_available() -> bool:
+    return bool(_SUPABASE_URL and _SUPABASE_KEY and not _SUPABASE_URL.startswith("https://your-project"))
+
+# Fragment support with fallback for older Streamlit versions
+try:
+    from streamlit import fragment as st_fragment
+except ImportError:
+    def st_fragment(func):
+        return func
+
+def _get_db_client():
+    """Get Supabase client with 2s connection timeout."""
+    if not _supabase_available():
+        raise RuntimeError("Supabase unavailable")
+    from supabase import create_client
+    return create_client(config.SUPABASE_URL, config.SUPABASE_KEY)
+
+@st.cache_data(ttl=15, show_spinner=False)
+def _cached_select(table: str, eq_key: str | None, eq_val: str | None, order: str | None, desc: bool, limit: int | None) -> tuple:
+    """Cached Supabase select with 2s timeout. Returns (data, error)."""
+    if not _supabase_available():
+        return [], "Supabase unavailable"
+    try:
+        client = _get_db_client()
+        query = client.table(table).select("*")
+        if eq_val is not None:
+            query = query.eq(eq_key, eq_val)
+        if order:
+            query = query.order(order, desc=desc)
+        if limit:
+            query = query.limit(limit)
+        data = query.execute().data or []
+        return data, None
+    except Exception as e:
+        return [], str(e)
+
+def safe_select(table: str, *, eq: dict | None = None, order: str | None = None, desc: bool = True, limit: int | None = None) -> list[dict]:
+    """Cached select with silent local mirror fallback."""
+    eq_key = next(iter(eq)) if eq else None
+    eq_val = eq.get(eq_key) if eq_key else None
+    data, err = _cached_select(table, eq_key, eq_val, order, True, limit)
+    if err:
+        return st.session_state.local_state.get(table, [])
+    # Sync to local mirror
+    state = st.session_state.local_state
+    state[table] = _merge_remote_into_local(data, state.get(table, []))
+    _save_local_state(state)
+    return data
+
+def safe_insert(table: str, row: dict) -> dict | None:
+    """Insert row to Supabase silently; always write to local mirror."""
+    row = dict(row)
+    row.setdefault("created_at", datetime.utcnow().isoformat())
+    state = st.session_state.local_state
+    state.setdefault(table, []).insert(0, row)
+    _save_local_state(state)
+    if not _supabase_available():
+        return row
+    try:
+        result = db.client().table(table).insert(row).execute()
+        if result.data:
+            _clear_cache_on_write()
+            return result.data[0]
+    except Exception:
+        pass
+    return row
+
+def safe_update(table: str, match_col: str, match_val: str, payload: dict) -> bool:
+    """Update row in Supabase silently; always update local mirror."""
+    state = st.session_state.local_state
+    local_list = state.get(table, [])
+    for item in local_list:
+        if item.get(match_col) == match_val:
+            item.update(payload)
+            break
+    _save_local_state(state)
+    if not _supabase_available():
+        return True
+    try:
+        db.client().table(table).update(payload).eq(match_col, match_val).execute()
+        _clear_cache_on_write()
+        return True
+    except Exception:
+        return True
+
+def safe_upsert(table: str, row: dict, on_conflict: str) -> bool:
+    """Upsert row in Supabase silently; always upsert local mirror."""
+    state = st.session_state.local_state
+    local_list = state.get(table, [])
+    conflict_val = row.get(on_conflict)
+    found = False
+    for i, item in enumerate(local_list):
+        if item.get(on_conflict) == conflict_val:
+            local_list[i] = {**item, **row}
+            found = True
+            break
+    if not found:
+        local_list.insert(0, row)
+    _save_local_state(state)
+    if not _supabase_available():
+        return True
+    try:
+        db.client().table(table).upsert(row, on_conflict=on_conflict).execute()
+        _clear_cache_on_write()
+        return True
+    except Exception:
+        return True
+
+def safe_delete(table: str, match_col: str, match_val: str) -> bool:
+    """Delete row from Supabase silently; always delete from local mirror."""
+    state = st.session_state.local_state
+    state[table] = [item for item in state.get(table, []) if item.get(match_col) != match_val]
+    _save_local_state(state)
+    if not _supabase_available():
+        return True
+    try:
+        db.client().table(table).delete().eq(match_col, match_val).execute()
+        _clear_cache_on_write()
+        return True
+    except Exception:
+        return True
+
+def _clear_cache_on_write() -> None:
+    """Clear all cached data so reads reflect writes immediately."""
+    _cached_select.clear()
+    st.session_state.local_state = _load_local_state()
+
+# Seed local state with defaults if empty
+if not st.session_state.local_state.get("agents"):
+    for a in DEFAULT_AGENTS:
+        a = dict(a)
+        a.setdefault("id", f"local-{a['name']}")
+        a.setdefault("created_at", datetime.utcnow().isoformat())
+    st.session_state.local_state["agents"] = DEFAULT_AGENTS[:]
+if not st.session_state.local_state.get("brands"):
+    for b in DEFAULT_BRANDS:
+        b = dict(b)
+        b.setdefault("id", f"local-{b['key']}")
+        b.setdefault("created_at", datetime.utcnow().isoformat())
+    st.session_state.local_state["brands"] = DEFAULT_BRANDS[:]
+_save_local_state(st.session_state.local_state)
+
+# ---------------------------------------------------------------------------
+# Default Agent Fleet (7 built-in agents) — Always available, never empty
+# ---------------------------------------------------------------------------
+DEFAULT_AGENTS = [
+    {"name": "research_agent", "purpose": "Find fresh, deduped signal on a topic", "enabled": False, "daily_cap": 1, "schedule": "daily", "runs_today": 0},
+    {"name": "growth_coach_agent", "purpose": "Personal progress and habit coaching", "enabled": False, "daily_cap": 1, "schedule": "daily", "runs_today": 0},
+    {"name": "summarize_librarian", "purpose": "Compress long-form input into a library entry", "enabled": False, "daily_cap": 6, "schedule": "every-20-min", "runs_today": 0},
+    {"name": "idea_strategist", "purpose": "Turn signal into ranked content angles", "enabled": False, "daily_cap": 1, "schedule": "daily", "runs_today": 0},
+    {"name": "packaging_studio", "purpose": "Draft platform-ready posts from one angle", "enabled": False, "daily_cap": 1, "schedule": "daily", "runs_today": 0},
+    {"name": "analytics_auditor", "purpose": "Read metrics, report what worked", "enabled": False, "daily_cap": 1, "schedule": "weekly", "runs_today": 0},
+    {"name": "ceo_supervisor", "purpose": "Daily cross-agent review and prioritisation", "enabled": False, "daily_cap": 1, "schedule": "daily", "runs_today": 0},
+]
+
+DEFAULT_BRANDS = [
+    {"key": "edivic", "name": "EDIVIC", "voice": "direct and technical; explains the mechanism, not the hype", "audience": "technical founders and operators evaluating AI tooling", "platforms": "linkedin, x, newsletter", "always": "concrete numbers, working examples, plain language", "never": "buzzwords, unsupported claims, engagement bait"},
+    {"key": "nowrides", "name": "NowRides", "voice": "warm and practical; speaks to operators, not investors", "audience": "mobility operators and small fleet owners", "platforms": "linkedin, x, newsletter", "always": "real operational detail, cost per unit, plain language", "never": "hype, vanity metrics, jargon"},
+    {"key": "velvet", "name": "Velvet", "voice": "elegant and understated; luxury without pretension", "audience": "premium lifestyle audience", "platforms": "linkedin, instagram, newsletter", "always": "refined tone, quality signals, restraint", "never": "loud, mass-market, discount language"},
+    {"key": "personal", "name": "Rishi (Personal)", "voice": "first-person, honest, builds in public, admits what broke", "audience": "founders and builders following the journey", "platforms": "x, linkedin, newsletter", "always": "specific lessons, real numbers, one clear takeaway", "never": "guru tone, fake certainty, emoji walls"},
+]
+
+# ---------------------------------------------------------------------------
+# Data Access Layer — Cached Supabase (2s timeout) + Local Mirror
+# ---------------------------------------------------------------------------
+def _supabase_available() -> bool:
+    return bool(_SUPABASE_URL and _SUPABASE_KEY and not _SUPABASE_URL.startswith("https://your-project"))
+
+# Fragment support with fallback for older Streamlit versions
+try:
+    from streamlit import fragment as st_fragment
+except ImportError:
+    def st_fragment(func):
+        return func
+
+def _get_db_client():
+    """Get Supabase client with 2s connection timeout."""
+    if not _supabase_available():
+        raise RuntimeError("Supabase unavailable")
+    from supabase import create_client
+    return create_client(config.SUPABASE_URL, config.SUPABASE_KEY)
+
+@st.cache_data(ttl=15, show_spinner=False)
+def _cached_select(table: str, eq_key: str | None, eq_val: str | None, order: str | None, desc: bool, limit: int | None) -> tuple:
+    """Cached Supabase select with 2s timeout. Returns (data, error)."""
+    if not _supabase_available():
+        return [], "Supabase unavailable"
+    try:
+        client = _get_db_client()
+        query = client.table(table).select("*")
+        if eq_val is not None:
+            query = query.eq(eq_key, eq_val)
+        if order:
+            query = query.order(order, desc=desc)
+        if limit:
+            query = query.limit(limit)
+        data = query.execute().data or []
+        return data, None
+    except Exception as e:
+        return [], str(e)
+
+def safe_select(table: str, *, eq: dict | None = None, order: str | None = None, desc: bool = True, limit: int | None = None) -> list[dict]:
+    """Cached select with silent local mirror fallback."""
+    eq_key = next(iter(eq)) if eq else None
+    eq_val = eq.get(eq_key) if eq_key else None
+    data, err = _cached_select(table, eq_key, eq_val, order, True, limit)
+    if err:
+        return st.session_state.local_state.get(table, [])
+    # Sync to local mirror
+    state = st.session_state.local_state
+    state[table] = _merge_remote_into_local(data, state.get(table, []))
+    _save_local_state(state)
+    return data
+
+def safe_insert(table: str, row: dict) -> dict | None:
+    """Insert row to Supabase silently; always write to local mirror."""
+    row = dict(row)
+    row.setdefault("created_at", datetime.utcnow().isoformat())
+    state = st.session_state.local_state
+    state.setdefault(table, []).insert(0, row)
+    _save_local_state(state)
+    if not _supabase_available():
+        return row
+    try:
+        result = db.client().table(table).insert(row).execute()
+        if result.data:
+            _clear_cache_on_write()
+            return result.data[0]
+    except Exception:
+        pass
+    return row
+
+def safe_update(table: str, match_col: str, match_val: str, payload: dict) -> bool:
+    """Update row in Supabase silently; always update local mirror."""
+    state = st.session_state.local_state
+    local_list = state.get(table, [])
+    for item in local_list:
+        if item.get(match_col) == match_val:
+            item.update(payload)
+            break
+    _save_local_state(state)
+    if not _supabase_available():
+        return True
+    try:
+        db.client().table(table).update(payload).eq(match_col, match_val).execute()
+        _clear_cache_on_write()
+        return True
+    except Exception:
+        return True
+
+def safe_upsert(table: str, row: dict, on_conflict: str) -> bool:
+    """Upsert row in Supabase silently; always upsert local mirror."""
+    state = st.session_state.local_state
+    local_list = state.get(table, [])
+    conflict_val = row.get(on_conflict)
+    found = False
+    for i, item in enumerate(local_list):
+        if item.get(on_conflict) == conflict_val:
+            local_list[i] = {**item, **row}
+            found = True
+            break
+    if not found:
+        local_list.insert(0, row)
+    _save_local_state(state)
+    if not _supabase_available():
+        return True
+    try:
+        db.client().table(table).upsert(row, on_conflict=on_conflict).execute()
+        _clear_cache_on_write()
+        return True
+    except Exception:
+        return True
+
+def safe_delete(table: str, match_col: str, match_val: str) -> bool:
+    """Delete row from Supabase silently; always delete from local mirror."""
+    state = st.session_state.local_state
+    state[table] = [item for item in state.get(table, []) if item.get(match_col) != match_val]
+    _save_local_state(state)
+    if not _supabase_available():
+        return True
+    try:
+        db.client().table(table).delete().eq(match_col, match_val).execute()
+        _clear_cache_on_write()
+        return True
+    except Exception:
+        return True
+
+def _clear_cache_on_write() -> None:
+    """Clear all cached data so reads reflect writes immediately."""
+    _cached_select.clear()
+    st.session_state.local_state = _load_local_state()
+
+# Seed local state with defaults if empty
+if not st.session_state.local_state.get("agents"):
+    for a in DEFAULT_AGENTS:
+        a = dict(a)
+        a.setdefault("id", f"local-{a['name']}")
+        a.setdefault("created_at", datetime.utcnow().isoformat())
+    st.session_state.local_state["agents"] = DEFAULT_AGENTS[:]
+if not st.session_state.local_state.get("brands"):
+    for b in DEFAULT_BRANDS:
+        b = dict(b)
+        b.setdefault("id", f"local-{b['key']}")
+        b.setdefault("created_at", datetime.utcnow().isoformat())
+    st.session_state.local_state["brands"] = DEFAULT_BRANDS[:]
+_save_local_state(st.session_state.local_state)
+
+# ---------------------------------------------------------------------------
+# Default Agent Fleet (7 built-in agents) — Always available, never empty
+# ---------------------------------------------------------------------------
+DEFAULT_AGENTS = [
+    {"name": "research_agent", "purpose": "Find fresh, deduped signal on a topic", "enabled": False, "daily_cap": 1, "schedule": "daily", "runs_today": 0},
+    {"name": "growth_coach_agent", "purpose": "Personal progress and habit coaching", "enabled": False, "daily_cap": 1, "schedule": "daily", "runs_today": 0},
+    {"name": "summarize_librarian", "purpose": "Compress long-form input into a library entry", "enabled": False, "daily_cap": 6, "schedule": "every-20-min", "runs_today": 0},
+    {"name": "idea_strategist", "purpose": "Turn signal into ranked content angles", "enabled": False, "daily_cap": 1, "schedule": "daily", "runs_today": 0},
+    {"name": "packaging_studio", "purpose": "Draft platform-ready posts from one angle", "enabled": False, "daily_cap": 1, "schedule": "daily", "runs_today": 0},
+    {"name": "analytics_auditor", "purpose": "Read metrics, report what worked", "enabled": False, "daily_cap": 1, "schedule": "weekly", "runs_today": 0},
+    {"name": "ceo_supervisor", "purpose": "Daily cross-agent review and prioritisation", "enabled": False, "daily_cap": 1, "schedule": "daily", "runs_today": 0},
+]
+
+DEFAULT_BRANDS = [
+    {"key": "edivic", "name": "EDIVIC", "voice": "direct and technical; explains the mechanism, not the hype", "audience": "technical founders and operators evaluating AI tooling", "platforms": "linkedin, x, newsletter", "always": "concrete numbers, working examples, plain language", "never": "buzzwords, unsupported claims, engagement bait"},
+    {"key": "nowrides", "name": "NowRides", "voice": "warm and practical; speaks to operators, not investors", "audience": "mobility operators and small fleet owners", "platforms": "linkedin, x, newsletter", "always": "real operational detail, cost per unit, plain language", "never": "hype, vanity metrics, jargon"},
+    {"key": "velvet", "name": "Velvet", "voice": "elegant and understated; luxury without pretension", "audience": "premium lifestyle audience", "platforms": "linkedin, instagram, newsletter", "always": "refined tone, quality signals, restraint", "never": "loud, mass-market, discount language"},
+    {"key": "personal", "name": "Rishi (Personal)", "voice": "first-person, honest, builds in public, admits what broke", "audience": "founders and builders following the journey", "platforms": "x, linkedin, newsletter", "always": "specific lessons, real numbers, one clear takeaway", "never": "guru tone, fake certainty, emoji walls"},
+]
+
+# ---------------------------------------------------------------------------
+# Design System CSS — Milky White Canvas + Dark Gradient Working Modules
 # ---------------------------------------------------------------------------
 _CSS = """
 <style>
@@ -264,18 +1427,18 @@ _CSS = """
 
 :root {
   /* ============================================================
-     REFINED COLOR PALETTE — Multi-Layered Depth
+     MILKY WHITE CANVAS + DARK GRADIENT WORKING MODULES
   ============================================================ */
-  /* Main Canvas */
-  --bg-warm: #F6F3EC;
-  --bg-alabaster: #FAF8F3;
+  /* Main Canvas — Milky White */
+  --bg-warm: #FAF9F6;
+  --bg-alabaster: #FDFCFA;
   --card-porcelain: #FCFBF9;
   --card-border: #E6E0D4;
   
-  /* Dark Executive Modules */
+  /* Dark Gradient Working Modules */
   --panel-obsidian: #141518;
   --panel-obsidian-elevated: #1E2025;
-  --panel-border: rgba(255,255,255,0.08);
+  --panel-border: rgba(255,255,255,0.09);
   --panel-specular: rgba(255,255,255,0.06);
   
   /* Text & Accents */
@@ -298,8 +1461,8 @@ _CSS = """
   --silver: #A1A1AA;
   --line: #E6E0D4;
   --white: #FAF9F6;
-  --bg-warm: #F6F3EC;
-  --bg-alabaster: #FAF8F3;
+  --bg-warm: #FAF9F6;
+  --bg-alabaster: #FDFCFA;
   --card-porcelain: #FCFBF9;
   --card-border: #E6E0D4;
   
@@ -313,15 +1476,27 @@ _CSS = """
   --shadow-gold: 0 0 0 3px rgba(212, 175, 55, 0.15);
   --shadow-emerald: 0 0 8px rgba(16, 185, 129, 0.35);
   
+  /* Dark Gradient for Working Modules */
+  --dark-gradient: linear-gradient(145deg, #1E2028 0%, #121317 100%);
+  --dark-gradient-hover: linear-gradient(145deg, #252932 0%, #1A1B20 100%);
+  --dark-border: rgba(255, 255, 255, 0.09);
+  
+  /* Button Gradients */
+  --btn-primary-gradient: linear-gradient(135deg, #2A2518 0%, #161512 100%);
+  --btn-primary-hover: linear-gradient(135deg, #1E2028 0%, #1A1B20 100%);
+  --btn-secondary-gradient: linear-gradient(135deg, #262934 0%, #171920 100%);
+  --btn-secondary-hover: linear-gradient(135deg, #1E2028 0%, #1A1B20 100%);
+  --btn-primary-cta: #D4AF37;
+  
   /* Radii */
   --radius-sm: 8px;
-  --radius-md: 12px;
+  --radius-md: 10px;
   --radius-lg: 16px;
   --radius-xl: 20px;
   --radius-pill: 999px;
   
   /* Transitions */
-  --ease-smooth: cubic-bezier(0.16, 1, 0.3, 1);
+  --ease-smooth: cubic-bezier(0.22, 1, 0.36, 1);
   --ease-snappy: cubic-bezier(0.16, 1, 0.3, 1);
   --duration-fast: 150ms;
   --duration-normal: 220ms;
@@ -334,9 +1509,8 @@ _CSS = """
 
 /* Global Font Loading & Smoothing */
 html, body, [data-testid="stAppViewContainer"] {
-  background: var(--bg-warm) !important;
-  background-image: radial-gradient(ellipse 80% 50% at 100% 0%, #FAF8F3 0%, #F4F0E8 60%, #F6F3EC 100%) !important;
-  color: var(--ink) !important;
+  background: #FAF9F6 !important;
+  color: #1A1A2E !important;
   font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif !important;
   -webkit-font-smoothing: antialiased !important;
   -moz-osx-font-smoothing: grayscale !important;
@@ -345,9 +1519,9 @@ html, body, [data-testid="stAppViewContainer"] {
 
 [data-testid="stMainBlockContainer"] {
   background: transparent !important;
-  padding-top: 0 !important;
+  padding-top: 128px !important;
   max-width: 1600px !important;
-  animation: fadeIn 0.55s var(--ease-smooth) forwards !important;
+  animation: fadeIn 0.55s cubic-bezier(0.16, 1, 0.3, 1) forwards !important;
 }
 
 @keyframes fadeIn {
@@ -358,7 +1532,7 @@ html, body, [data-testid="stAppViewContainer"] {
 /* Editorial Typography Hierarchy */
 h1, h2, h3, h4, h5, h6 {
   font-family: 'Instrument Serif', Georgia, 'Iowan Old Style', serif !important;
-  color: var(--ink) !important;
+  color: #141518 !important;
   letter-spacing: -0.02em !important;
   line-height: 1.15 !important;
 }
@@ -373,7 +1547,7 @@ h1 + .stMarkdown > p:first-child,
 h1 + .stCaption {
   font-family: 'Plus Jakarta Sans', sans-serif !important;
   font-size: 0.95rem !important;
-  color: var(--muted) !important;
+  color: #71717A !important;
   font-weight: 400 !important;
   margin-top: -0.25rem !important;
   margin-bottom: 1.75rem !important;
@@ -383,7 +1557,7 @@ h1 + .stCaption {
 h2 { 
   font-size: clamp(1.25rem, 2vw, 1.5rem) !important; 
   font-weight: 500 !important; 
-  color: var(--ink) !important; 
+  color: #141518 !important; 
   margin-top: 2.25rem !important; 
   margin-bottom: 1.125rem !important; 
 }
@@ -391,7 +1565,7 @@ h2 {
 h3 { 
   font-size: 1.05rem !important; 
   font-weight: 500 !important; 
-  color: var(--ink) !important; 
+  color: #141518 !important; 
   margin-bottom: 0.75rem !important; 
 }
 
@@ -426,9 +1600,8 @@ code, kbd, samp,
    GLOBAL CANVAS & AMBIENT BACKGROUND
 ============================================================ */
 html, body, [data-testid="stAppViewContainer"] {
-  background: var(--bg-warm) !important;
-  background-image: radial-gradient(ellipse 80% 50% at 100% 0%, #FAF8F3 0%, #F4F0E8 60%, #F6F3EC 100%) !important;
-  color: var(--ink) !important;
+  background: #FAF9F6 !important;
+  color: #1A1A2E !important;
   font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, sans-serif !important;
   -webkit-font-smoothing: antialiased !important;
   -moz-osx-font-smoothing: grayscale !important;
@@ -436,9 +1609,9 @@ html, body, [data-testid="stAppViewContainer"] {
 
 [data-testid="stMainBlockContainer"] {
   background: transparent !important;
-  padding-top: 0 !important;
+  padding-top: 128px !important;
   max-width: 1600px !important;
-  animation: fadeIn 0.55s var(--ease-smooth) forwards !important;
+  animation: fadeIn 0.55s cubic-bezier(0.22, 1, 0.36, 1) forwards !important;
 }
 
 @keyframes fadeIn {
@@ -447,7 +1620,7 @@ html, body, [data-testid="stAppViewContainer"] {
 }
 
 /* ============================================================
-   REMOVE SIDEBAR COMPLETELY
+   HIDE SIDEBAR COMPLETELY
 ============================================================ */
 [data-testid="stSidebar"] {
   display: none !important;
@@ -474,14 +1647,14 @@ html, body, [data-testid="stAppViewContainer"] {
   left: 0 !important;
   right: 0 !important;
   height: 56px !important;
-  background: var(--panel-obsidian) !important;
-  border-bottom: 2px solid var(--ochre-border) !important;
+  background: #141518 !important;
+  border-bottom: 2px solid rgba(212, 175, 55, 0.5) !important;
   z-index: 10000 !important;
   display: flex !important;
   align-items: center !important;
   justify-content: space-between !important;
   padding: 0 24px !important;
-  box-shadow: var(--shadow-inner), 0 4px 24px rgba(0,0,0,0.3) !important;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.06), 0 4px 24px rgba(15,17,21,0.3) !important;
 }
 
 .executive-top-bar-left {
@@ -505,7 +1678,7 @@ html, body, [data-testid="stAppViewContainer"] {
   font-family: 'Plus Jakarta Sans', sans-serif !important;
   font-weight: 700 !important;
   font-size: 1.1rem !important;
-  color: var(--white) !important;
+  color: #FAF9F6 !important;
   letter-spacing: 0.06em !important;
   text-transform: uppercase !important;
 }
@@ -513,7 +1686,7 @@ html, body, [data-testid="stAppViewContainer"] {
 .executive-brand-sub {
   font-family: 'Plus Jakarta Sans', sans-serif !important;
   font-size: 0.62rem !important;
-  color: var(--ochre-gold) !important;
+  color: #C9A227 !important;
   font-weight: 600 !important;
   letter-spacing: 0.08em !important;
   text-transform: uppercase !important;
@@ -531,15 +1704,15 @@ html, body, [data-testid="stAppViewContainer"] {
   align-items: center !important;
   gap: 6px !important;
   padding: 6px 14px !important;
-  border-radius: var(--radius-pill) !important;
+  border-radius: 999px !important;
   font-family: 'Plus Jakarta Sans', sans-serif !important;
   font-size: 0.68rem !important;
   font-weight: 600 !important;
   text-transform: uppercase !important;
   letter-spacing: 0.08em !important;
 }
-.conn-ok { background: rgba(16, 185, 129, 0.15) !important; color: var(--emerald) !important; border: 1px solid rgba(16, 185, 129, 0.3) !important; }
-.conn-warn { background: var(--ochre-wash) !important; color: var(--ochre-gold) !important; border: 1px solid var(--ochre-border) !important; }
+.conn-ok { background: rgba(16, 185, 129, 0.15) !important; color: #10B981 !important; border: 1px solid rgba(16, 185, 129, 0.3) !important; }
+.conn-warn { background: rgba(212, 175, 55, 0.12) !important; color: #C9A227 !important; border: 1px solid rgba(212, 175, 55, 0.5) !important; }
 
 .executive-nav-strip {
   position: fixed !important;
@@ -547,9 +1720,8 @@ html, body, [data-testid="stAppViewContainer"] {
   left: 0 !important;
   right: 0 !important;
   height: 56px !important;
-  background: var(--bg-warm) !important;
-  background-image: radial-gradient(ellipse 80% 50% at 100% 0%, #FAF8F3 0%, #F4F0E8 60%, #F6F3EC 100%) !important;
-  border-bottom: 1px solid var(--card-border) !important;
+  background: #FAF9F6 !important;
+  border-bottom: 1px solid #E6E0D4 !important;
   z-index: 9999 !important;
   display: flex !important;
   align-items: center !important;
@@ -567,12 +1739,12 @@ html, body, [data-testid="stAppViewContainer"] {
   max-width: 200px !important;
   min-height: 40px !important;
   padding: 0 16px !important;
-  border-radius: var(--radius-lg) !important;
+  border-radius: 16px !important;
   font-family: 'Plus Jakarta Sans', sans-serif !important;
   font-size: 0.82rem !important;
   font-weight: 600 !important;
   letter-spacing: 0.01em !important;
-  transition: all 180ms cubic-bezier(0.16, 1, 0.3, 1) !important;
+  transition: all 180ms cubic-bezier(0.22, 1, 0.36, 1) !important;
   border: 1px solid transparent !important;
   cursor: pointer !important;
   text-decoration: none !important;
@@ -580,43 +1752,43 @@ html, body, [data-testid="stAppViewContainer"] {
 
 .executive-nav-btn:focus {
   outline: none !important;
-  box-shadow: var(--shadow-gold) !important;
+  box-shadow: 0 0 0 3px rgba(212, 175, 55, 0.15) !important;
 }
 
 .executive-nav-btn.active {
-  background: var(--panel-obsidian) !important;
-  color: var(--ochre-gold) !important;
-  border: 1px solid var(--ochre-border) !important;
-  box-shadow: var(--shadow-inner), 0 0 0 1px var(--ochre-border) inset !important;
+  background: linear-gradient(135deg, #2A2518 0%, #161512 100%) !important;
+  color: #D4AF37 !important;
+  border: 1px solid rgba(212, 175, 55, 0.5) !important;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.06), 0 0 0 1px rgba(212,175,55,0.5) inset !important;
 }
 
 .executive-nav-btn:not(.active) {
   background: #FFFFFF !important;
-  color: var(--ink) !important;
+  color: #1A1A2E !important;
   border: 1px solid #E6E0D4 !important;
 }
 
 .executive-nav-btn:not(.active):hover {
   background: #FEFEF8 !important;
-  border-color: var(--ochre-border) !important;
+  border-color: rgba(212, 175, 55, 0.5) !important;
   transform: translateY(-1px) !important;
   box-shadow: 0 4px 16px rgba(212, 175, 55, 0.15) !important;
 }
 
 /* Adjust main container to account for fixed top bars */
 [data-testid="stMainBlockContainer"] {
+  background: transparent !important;
   padding-top: 128px !important;
   max-width: 1580px !important;
-  animation: fadeIn 0.55s var(--ease-smooth) forwards !important;
+  animation: fadeIn 0.55s cubic-bezier(0.22, 1, 0.36, 1) forwards !important;
 }
 
 /* ============================================================
    GLOBAL CANVAS & AMBIENT BACKGROUND
 ============================================================ */
 html, body, [data-testid="stAppViewContainer"] {
-  background: var(--bg-warm) !important;
-  background-image: radial-gradient(ellipse 80% 50% at 100% 0%, #FAF8F3 0%, #F4F0E8 60%, #F6F3EC 100%) !important;
-  color: var(--ink) !important;
+  background: #FAF9F6 !important;
+  color: #1A1A2E !important;
   font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, sans-serif !important;
   -webkit-font-smoothing: antialiased !important;
   -moz-osx-font-smoothing: grayscale !important;
@@ -625,101 +1797,8 @@ html, body, [data-testid="stAppViewContainer"] {
 [data-testid="stMainBlockContainer"] {
   background: transparent !important;
   padding-top: 128px !important;
-  max-width: 1600px !important;
-  animation: fadeIn 0.55s var(--ease-smooth) forwards !important;
-}
-
-@keyframes fadeIn {
-  from { opacity: 0; transform: translateY(8px); }
-  to { opacity: 1; transform: translateY(0); }
-}
-
-/* ============================================================
-   EDITORIAL TYPOGRAPHY HIERARCHY
-============================================================ */
-h1, h2, h3, h4, h5, h6 {
-  font-family: 'Instrument Serif', Georgia, 'Iowan Old Style', serif !important;
-  color: var(--ink) !important;
-  letter-spacing: -0.02em !important;
-  line-height: 1.15 !important;
-}
-
-h1 { 
-  font-size: clamp(1.85rem, 3vw, 2.35rem) !important; 
-  font-weight: 600 !important;
-  letter-spacing: -0.03em !important;
-  margin-bottom: 0.375rem !important; 
-}
-h1 + .stMarkdown > p:first-child,
-h1 + .stCaption {
-  font-family: 'Plus Jakarta Sans', sans-serif !important;
-  font-size: 0.95rem !important;
-  color: var(--muted) !important;
-  font-weight: 400 !important;
-  margin-top: -0.25rem !important;
-  margin-bottom: 1.75rem !important;
-  line-height: 1.6 !important;
-}
-
-h2 { 
-  font-size: clamp(1.25rem, 2vw, 1.5rem) !important; 
-  font-weight: 500 !important; 
-  color: var(--ink) !important; 
-  margin-top: 2.25rem !important; 
-  margin-bottom: 1.125rem !important; 
-}
-
-h3 { 
-  font-size: 1.05rem !important; 
-  font-weight: 500 !important; 
-  color: var(--ink) !important; 
-  margin-bottom: 0.75rem !important; 
-}
-
-/* Global UI Font */
-.stButton > button,
-.stFormSubmitButton > button,
-.stSelectbox, .stTextInput, .stTextArea, .stNumberInput,
-.stToggle, .stCheckbox, .stRadio,
-.stMarkdown, .stCaption, .stAlert,
-[data-testid="stDataFrame"] {
-  font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, sans-serif !important;
-}
-
-/* Monospace for Technical Data */
-code, kbd, samp,
-[data-testid="stCodeBlock"],
-.stCodeBlock,
-.log-line,
-.stMarkdown code,
-.stNumberInput input,
-.stTextInput input[type="text"],
-[data-testid="stMetricValue"],
-[data-testid="stMetricLabel"],
-.stMetric [data-testid="stMetricValue"],
-.stMetric [data-testid="stMetricLabel"] {
-  font-family: 'JetBrains Mono', 'Fira Code', 'Monaco', 'Menlo', monospace !important;
-  font-variant-numeric: tabular-nums !important;
-  font-feature-settings: "tnum" "liga" "calt" !important;
-}
-
-/* ============================================================
-   GLOBAL CANVAS & AMBIENT BACKGROUND
-============================================================ */
-html, body, [data-testid="stAppViewContainer"] {
-  background: var(--bg-warm) !important;
-  background-image: radial-gradient(ellipse 80% 50% at 100% 0%, #FAF8F3 0%, #F4F0E8 60%, #F6F3EC 100%) !important;
-  color: var(--ink) !important;
-  font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, sans-serif !important;
-  -webkit-font-smoothing: antialiased !important;
-  -moz-osx-font-smoothing: grayscale !important;
-}
-
-[data-testid="stMainBlockContainer"] {
-  background: transparent !important;
-  padding-top: 128px !important;
-  max-width: 1600px !important;
-  animation: fadeIn 0.55s var(--ease-smooth) forwards !important;
+  max-width: 1580px !important;
+  animation: fadeIn 0.55s cubic-bezier(0.22, 1, 0.36, 1) forwards !important;
 }
 
 @keyframes fadeIn {
@@ -770,29 +1849,29 @@ span[class*="material-icons"],
 }
 
 /* ============================================================
-   EXECUTIVE KPI METRIC CARDS — Dark Charcoal with Gold/Ivory
+   EXECUTIVE KPI METRIC CARDS — Dark Gradient with Gold/Ivory
 ============================================================ */
 .kpi-card {
-  background: var(--panel-obsidian) !important;
-  border: 1px solid var(--panel-border) !important;
-  border-radius: var(--radius-lg) !important;
+  background: linear-gradient(145deg, #1E2028 0%, #121317 100%) !important;
+  border: 1px solid rgba(255, 255, 255, 0.09) !important;
+  border-radius: 16px !important;
   padding: 1.35rem 1.5rem !important;
   text-align: center !important;
-  color: var(--white) !important;
-  box-shadow: var(--shadow-inner), var(--shadow-lg) !important;
-  transition: all var(--duration-normal) var(--ease-smooth) !important;
+  color: #FAF9F6 !important;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.06), 0 10px 30px rgba(15,17,21,0.14) !important;
+  transition: all 180ms cubic-bezier(0.22, 1, 0.36, 1) !important;
 }
 .kpi-card:hover { 
-  border-color: var(--ochre-border) !important; 
+  border-color: rgba(212, 175, 55, 0.5) !important; 
   transform: translateY(-2px) !important; 
-  box-shadow: var(--shadow-inner), 0 16px 48px -16px rgba(212, 175, 55, 0.15) !important;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.06), 0 16px 48px -16px rgba(212, 175, 55, 0.15) !important;
 }
 .kpi-card .value { 
   font-family: 'JetBrains Mono', monospace !important;
   font-variant-numeric: tabular-nums !important;
   font-size: clamp(1.75rem, 3vw, 2.1rem) !important; 
   font-weight: 700 !important; 
-  color: var(--ochre-gold) !important; 
+  color: #C9A227 !important; 
   display: block !important; 
   margin-bottom: 0.25rem !important; 
   line-height: 1.1 !important; 
@@ -803,14 +1882,14 @@ span[class*="material-icons"],
   font-size: 0.68rem !important; 
   text-transform: uppercase !important; 
   letter-spacing: 0.1em !important; 
-  color: var(--silver) !important; 
+  color: #A1A1AA !important; 
   display: block !important; 
   font-weight: 600 !important; 
 }
 .kpi-card .sub { 
   font-family: 'Plus Jakarta Sans', sans-serif !important;
   font-size: 0.72rem !important; 
-  color: var(--ochre-gold) !important; 
+  color: #C9A227 !important; 
   font-weight: 600 !important; 
   display: block !important; 
   margin-top: 0.5rem !important; 
@@ -823,9 +1902,9 @@ span[class*="material-icons"],
   display: flex !important;
   gap: 0 !important;
   padding: 1.25rem 1.5rem !important;
-  background: var(--panel-obsidian) !important;
-  border: 1px solid var(--panel-border) !important;
-  border-radius: var(--radius-lg) !important;
+  background: linear-gradient(145deg, #1E2028 0%, #121317 100%) !important;
+  border: 1px solid rgba(255, 255, 255, 0.09) !important;
+  border-radius: 16px !important;
   overflow-x: auto !important;
   position: relative !important;
 }
@@ -836,7 +1915,7 @@ span[class*="material-icons"],
   left: 3.5rem !important;
   right: 3.5rem !important;
   height: 2px !important;
-  background: linear-gradient(90deg, var(--panel-border) 0%, var(--ochre-border) 50%, var(--panel-border) 100%) !important;
+  background: linear-gradient(90deg, rgba(255,255,255,0.08) 0%, rgba(212,175,55,0.5) 50%, rgba(255,255,255,0.08) 100%) !important;
   transform: translateY(-50%) !important;
   z-index: 0 !important;
 }
@@ -854,23 +1933,23 @@ span[class*="material-icons"],
   border-radius: 50% !important;
   margin: 0 auto 0.5rem !important; 
   border: 2px solid rgba(255,255,255,0.12) !important;
-  background: var(--panel-obsidian) !important; 
-  transition: all var(--duration-normal) var(--ease-smooth) !important;
+  background: #141518 !important; 
+  transition: all 180ms cubic-bezier(0.22, 1, 0.36, 1) !important;
   position: relative !important;
-  box-shadow: 0 0 0 4px var(--panel-obsidian) !important;
+  box-shadow: 0 0 0 4px #141518 !important;
 }
 .pipeline-step.armed .pipeline-dot { 
-  background: var(--emerald) !important; 
-  border-color: var(--emerald) !important; 
-  box-shadow: 0 0 0 4px var(--panel-obsidian), 0 0 12px var(--emerald-glow) !important; 
+  background: #10B981 !important; 
+  border-color: #10B981 !important; 
+  box-shadow: 0 0 0 4px #141518, 0 0 12px rgba(16, 185, 129, 0.35) !important; 
 }
 .pipeline-step.queued .pipeline-dot { 
-  background: var(--ochre-gold) !important; 
-  border-color: var(--ochre-gold) !important; 
-  box-shadow: 0 0 0 4px var(--panel-obsidian), 0 0 12px var(--ochre-wash) !important; 
+  background: #D4AF37 !important; 
+  border-color: #D4AF37 !important; 
+  box-shadow: 0 0 0 4px #141518, 0 0 12px rgba(212, 175, 55, 0.25) !important; 
 }
 .pipeline-step.standby .pipeline-dot { 
-  background: var(--panel-obsidian) !important; 
+  background: #141518 !important; 
   border-color: rgba(255,255,255,0.12) !important; 
 }
 .pipeline-label { 
@@ -878,13 +1957,13 @@ span[class*="material-icons"],
   font-size: 0.68rem !important; 
   text-transform: uppercase !important; 
   letter-spacing: 0.08em !important; 
-  color: var(--silver-dim) !important; 
+  color: #71717A !important; 
   font-weight: 600 !important; 
   white-space: nowrap !important;
 }
-.pipeline-step.armed .pipeline-label { color: var(--emerald) !important; font-weight: 700 !important; }
-.pipeline-step.queued .pipeline-label { color: var(--ochre-gold) !important; font-weight: 700 !important; }
-.pipeline-step.standby .pipeline-label { color: var(--silver-dim) !important; }
+.pipeline-step.armed .pipeline-label { color: #10B981 !important; font-weight: 700 !important; }
+.pipeline-step.queued .pipeline-label { color: #D4AF37 !important; font-weight: 700 !important; }
+.pipeline-step.standby .pipeline-label { color: #71717A !important; }
 
 /* ============================================================
    STATUS BADGES — Refined Editorial Style
@@ -893,7 +1972,7 @@ span[class*="material-icons"],
   display: inline-flex !important;
   align-items: center !important;
   padding: 0.175rem 0.625rem !important;
-  border-radius: var(--radius-pill) !important;
+  border-radius: 999px !important;
   font-family: 'Plus Jakarta Sans', sans-serif !important;
   font-size: 0.65rem !important;
   font-weight: 600 !important;
@@ -916,514 +1995,48 @@ span[class*="material-icons"],
    BUTTONS — Tactile Micro-Interactions
 ============================================================ */
 .stButton > button, .stFormSubmitButton > button {
-  border-radius: var(--radius-md) !important;
+  border-radius: 10px !important;
   font-family: 'Plus Jakarta Sans', sans-serif !important;
   font-weight: 600 !important;
   font-size: 0.875rem !important;
   letter-spacing: 0.01em !important;
-  transition: all var(--duration-normal) var(--ease-smooth) !important;
-  border: 1px solid var(--card-border) !important;
+  transition: all 180ms cubic-bezier(0.22, 1, 0.36, 1) !important;
+  border: 1px solid #E6E0D4 !important;
   background: #FFFFFF !important;
-  color: var(--ink) !important;
+  color: #1A1A2E !important;
   padding: 0.625rem 1.375rem !important;
 }
 .stButton > button:hover, .stFormSubmitButton > button:hover {
-  border-color: var(--ochre-gold) !important;
-  color: var(--ink) !important;
-  background: #FEFEF8 !important;
-  transform: translateY(-1px) !important;
-  box-shadow: var(--shadow-sm) !important;
-}
-.stButton > button:active, .stFormSubmitButton > button:active {
-  transform: translateY(0) !important;
-}
-.stButton > button[kind="primary"], .stFormSubmitButton > button[kind="primary"] {
-  background: var(--panel-obsidian) !important;
-  border-color: var(--ochre-border) !important;
-  color: var(--white) !important;
-  box-shadow: 0 0 0 1px var(--ochre-border) inset !important;
-}
-.stButton > button[kind="primary"]:hover, .stFormSubmitButton > button[kind="primary"]:hover {
-  background: var(--panel-obsidian-elevated) !important;
-  border-color: var(--ochre-gold) !important;
-  color: var(--white) !important;
-  box-shadow: 0 4px 20px rgba(212, 175, 55, 0.25) !important;
-}
-.stButton > button[kind="secondary"] {
-  background: var(--card-porcelain) !important;
-  border-color: var(--card-border) !important;
-  color: var(--ink) !important;
-}
-.stButton > button[kind="secondary"]:hover {
-  background: #F3EFE6 !important;
-  border-color: var(--ochre-border) !important;
-  color: var(--ink) !important;
-}
-
-/* ============================================================
-   INPUTS — Clean, Consistent, High-Contrast
-============================================================ */
-.stTextInput > div > div > input,
-.stTextArea > div > div > textarea,
-.stSelectbox > div > div,
-.stNumberInput > div > div > input {
-  background: #FFFFFF !important;
-  border: 1px solid var(--card-border) !important;
-  border-radius: var(--radius-md) !important;
-  color: var(--ink) !important;
-  font-family: 'Plus Jakarta Sans', sans-serif !important;
-  font-size: 0.9rem !important;
-  padding: 0.625rem 0.875rem !important;
-  transition: all var(--duration-fast) var(--ease-smooth) !important;
-}
-.stTextInput > div > div > input:focus,
-.stTextArea > div > div > textarea:focus,
-.stSelectbox > div > div:focus-within,
-.stNumberInput > div > div > input:focus {
-  border-color: var(--ochre-gold) !important;
-  box-shadow: var(--shadow-gold) !important;
-  outline: none !important;
-}
-.stSelectbox > div > div {
-  background: #FFFFFF !important;
-  border: 1px solid var(--card-border) !important;
-  border-radius: var(--radius-md) !important;
-}
-.stTextArea > div > div > textarea {
-  min-height: 100px !important;
-  resize: vertical !important;
-  line-height: 1.6 !important;
-  font-family: 'Plus Jakarta Sans', sans-serif !important;
-}
-.stToggle > label { 
-  color: var(--ink) !important; 
-  font-family: 'Plus Jakarta Sans', sans-serif !important;
-  font-weight: 500 !important;
-}
-
-/* ============================================================
-   DARK EXECUTIVE CARDS — via :has() markers (FIX 2)
-   True Dark Obsidian Charcoal cards on Pure White/Alabaster background
-============================================================ */
-
-/* Agent Fleet Dark Cards - True Dark Obsidian Charcoal */
-[data-testid="stVerticalBlockBorderWrapper"]:has(.agent-card-marker),
-div[data-testid="stContainer"]:has(.agent-card-marker),
-div:has(> div > .agent-card-marker),
-div:has(> div > div > .agent-card-marker) {
-  background: #141518 !important;
-  background-color: #141518 !important;
-  border: 1px solid #2A2D35 !important;
-  border-radius: 16px !important;
-  padding: 18px !important;
-  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.16) !important;
-}
-
-/* Force high-contrast typography inside every dark agent card */
-[data-testid="stVerticalBlockBorderWrapper"]:has(.agent-card-marker) *,
-div[data-testid="stContainer"]:has(.agent-card-marker) *,
-div:has(> div > .agent-card-marker) *,
-div:has(> div > div > .agent-card-marker) * {
-  color: #FAF9F6 !important;
-}
-
-[data-testid="stVerticalBlockBorderWrapper"]:has(.agent-card-marker) h3,
-[data-testid="stVerticalBlockBorderWrapper"]:has(.agent-card-marker) h4,
-[data-testid="stVerticalBlockBorderWrapper"]:has(.agent-card-marker) strong,
-div[data-testid="stContainer"]:has(.agent-card-marker) h3,
-div[data-testid="stContainer"]:has(.agent-card-marker) h4,
-div[data-testid="stContainer"]:has(.agent-card-marker) strong,
-div:has(> div > .agent-card-marker) h3,
-div:has(> div > .agent-card-marker) h4,
-div:has(> div > .agent-card-marker) strong,
-div:has(> div > div > .agent-card-marker) h3,
-div:has(> div > div > .agent-card-marker) h4,
-div:has(> div > div > .agent-card-marker) strong {
-  color: #FAF9F6 !important;
-  font-weight: 600 !important;
-}
-
-[data-testid="stVerticalBlockBorderWrapper"]:has(.agent-card-marker) .stMarkdown,
-div[data-testid="stContainer"]:has(.agent-card-marker) .stMarkdown {
-  color: #FAF9F6 !important;
-}
-
-[data-testid="stVerticalBlockBorderWrapper"]:has(.agent-card-marker) .stCaption,
-div[data-testid="stContainer"]:has(.agent-card-marker) .stCaption {
-  color: #CBD5E1 !important;
-  font-size: 0.86rem !important;
-  opacity: 1 !important;
-}
-
-/* Toggle labels, input labels, captions */
-[data-testid="stVerticalBlockBorderWrapper"]:has(.agent-card-marker) .stToggle label,
-[data-testid="stVerticalBlockBorderWrapper"]:has(.agent-card-marker) .stNumberInput label,
-[data-testid="stVerticalBlockBorderWrapper"]:has(.agent-card-marker) .stTextInput label,
-[data-testid="stVerticalBlockBorderWrapper"]:has(.agent-card-marker) .stSelectbox label,
-[data-testid="stVerticalBlockBorderWrapper"]:has(.agent-card-marker) .stTextInput > div > label,
-[data-testid="stVerticalBlockBorderWrapper"]:has(.agent-card-marker) .stNumberInput > div > label,
-[data-testid="stVerticalBlockBorderWrapper"]:has(.agent-card-marker) .stToggle > label,
-div[data-testid="stContainer"]:has(.agent-card-marker) .stToggle label,
-div[data-testid="stContainer"]:has(.agent-card-marker) .stNumberInput label,
-div[data-testid="stContainer"]:has(.agent-card-marker) .stTextInput label,
-div[data-testid="stContainer"]:has(.agent-card-marker) .stSelectbox label {
-  color: #FAF9F6 !important;
-  font-weight: 600 !important;
-  opacity: 1 !important;
-}
-
-/* Status badges */
-[data-testid="stVerticalBlockBorderWrapper"]:has(.agent-card-marker) .tag-armed,
-div[data-testid="stContainer"]:has(.agent-card-marker) .tag-armed {
-  background: rgba(16, 185, 129, 0.18) !important;
-  color: #34D399 !important;
-  border: 1px solid rgba(52, 211, 153, 0.4) !important;
-}
-[data-testid="stVerticalBlockBorderWrapper"]:has(.agent-card-marker) .tag-standby,
-div[data-testid="stContainer"]:has(.agent-card-marker) .tag-standby {
-  background: rgba(255, 255, 255, 0.08) !important;
-  color: #E2E8F0 !important;
-  border: 1px solid rgba(255, 255, 255, 0.18) !important;
-}
-
-/* Number Input inside Dark Agent Card */
-[data-testid="stVerticalBlockBorderWrapper"]:has(.agent-card-marker) .stNumberInput > div > div > input,
-div[data-testid="stContainer"]:has(.agent-card-marker) .stNumberInput > div > div > input {
-  background: #1E2028 !important;
-  color: #FAF9F6 !important;
-  border: 1px solid #383C47 !important;
-  border-radius: var(--radius-md) !important;
-}
-
-/* Save button inside Dark Agent Card */
-[data-testid="stVerticalBlockBorderWrapper"]:has(.agent-card-marker) .stButton > button[kind="primary"],
-div[data-testid="stContainer"]:has(.agent-card-marker) .stButton > button[kind="primary"] {
-  background: #1E2028 !important;
-  color: #D4AF37 !important;
-  border: 1px solid rgba(212, 175, 55, 0.55) !important;
-  font-weight: 600 !important;
-}
-[data-testid="stVerticalBlockBorderWrapper"]:has(.agent-card-marker) .stButton > button[kind="primary"]:hover,
-div[data-testid="stContainer"]:has(.agent-card-marker) .stButton > button[kind="primary"]:hover {
-  background: #272C35 !important;
-  border-color: #D4AF37 !important;
-}
-
-/* Run button inside Dark Agent Card */
-[data-testid="stVerticalBlockBorderWrapper"]:has(.agent-card-marker) .stButton > button[kind="secondary"],
-div[data-testid="stContainer"]:has(.agent-card-marker) .stButton > button[kind="secondary"] {
-  background: #D4AF37 !important;
-  color: #141518 !important;
-  font-weight: 700 !important;
-  border: none !important;
-}
-[data-testid="stVerticalBlockBorderWrapper"]:has(.agent-card-marker) .stButton > button[kind="secondary"]:hover,
-div[data-testid="stContainer"]:has(.agent-card-marker) .stButton > button[kind="secondary"]:hover {
-  background: #C9A227 !important;
-}
-
-/* Number Input inside Dark Agent Card */
-[data-testid="stVerticalBlockBorderWrapper"]:has(.agent-card-marker) .stNumberInput > div > div > input,
-div[data-testid="stContainer"]:has(.agent-card-marker) .stNumberInput > div > div > input {
-  background: #1E2028 !important;
-  color: #FAF9F6 !important;
-  border: 1px solid #383C47 !important;
-  border-radius: var(--radius-md) !important;
-}
-
-/* ============================================================
-   LIGHT PANEL CARDS — Task Dispatch Studio & Task Queue (FIX 3)
-============================================================ */
-
-/* Light Panel Cards — Clean White/Alabaster */
-[data-testid="stVerticalBlockBorderWrapper"]:has(.light-panel-marker),
-div[data-testid="stContainer"]:has(.light-panel-marker),
-div:has(> div > .light-panel-marker) {
-  background: #FFFFFF !important;
-  background-color: #FFFFFF !important;
-  border: 1px solid #E2DDD2 !important;
-  border-radius: 16px !important;
-  padding: 20px !important;
-  box-shadow: 0 4px 20px rgba(24, 24, 27, 0.06) !important;
-}
-
-/* Force high-contrast dark text inside light panels */
-[data-testid="stVerticalBlockBorderWrapper"]:has(.light-panel-marker) *,
-div[data-testid="stContainer"]:has(.light-panel-marker) * {
-  color: #18181B !important;
-}
-
-[data-testid="stVerticalBlockBorderWrapper"]:has(.light-panel-marker) label,
-[data-testid="stVerticalBlockBorderWrapper"]:has(.light-panel-marker) .stSelectbox label,
-[data-testid="stVerticalBlockBorderWrapper"]:has(.light-panel-marker) .stTextInput label,
-[data-testid="stVerticalBlockBorderWrapper"]:has(.light-panel-marker) .stTextArea label,
-[data-testid="stVerticalBlockBorderWrapper"]:has(.light-panel-marker) .stNumberInput label,
-div[data-testid="stContainer"]:has(.light-panel-marker) label,
-div[data-testid="stContainer"]:has(.light-panel-marker) .stSelectbox label,
-div[data-testid="stContainer"]:has(.light-panel-marker) .stTextInput label,
-div[data-testid="stContainer"]:has(.light-panel-marker) .stTextArea label,
-div[data-testid="stContainer"]:has(.light-panel-marker) .stNumberInput label {
-  color: #18181B !important;
-  font-weight: 600 !important;
-}
-
-[data-testid="stVerticalBlockBorderWrapper"]:has(.light-panel-marker) .stSelectbox > div > div,
-[data-testid="stVerticalBlockBorderWrapper"]:has(.light-panel-marker) .stTextInput > div > div > input,
-[data-testid="stVerticalBlockBorderWrapper"]:has(.light-panel-marker) .stTextArea > div > div > textarea,
-[data-testid="stVerticalBlockBorderWrapper"]:has(.light-panel-marker) .stNumberInput > div > div > input,
-div[data-testid="stContainer"]:has(.light-panel-marker) .stSelectbox > div > div,
-div[data-testid="stContainer"]:has(.light-panel-marker) .stTextInput > div > div > input,
-div[data-testid="stContainer"]:has(.light-panel-marker) .stTextArea > div > div > textarea,
-div[data-testid="stContainer"]:has(.light-panel-marker) .stNumberInput > div > div > input {
-  background: #F8FAFC !important;
-  border: 1px solid #CBD5E1 !important;
-  color: #18181B !important;
-  border-radius: 12px !important;
-}
-
-[data-testid="stVerticalBlockBorderWrapper"]:has(.light-panel-marker) .stTextInput > div > div > input::placeholder,
-[data-testid="stVerticalBlockBorderWrapper"]:has(.light-panel-marker) .stTextArea > div > div > textarea::placeholder,
-div[data-testid="stContainer"]:has(.light-panel-marker) .stTextInput > div > div > input::placeholder,
-div[data-testid="stContainer"]:has(.light-panel-marker) .stTextArea > div > div > textarea::placeholder {
-  color: #64748B !important;
-}
-
-/* ============================================================
-   LOGIN CARD DARK
-============================================================ */
-[data-testid="stVerticalBlockBorderWrapper"]:has(.login-marker) {
-  background: #141518 !important;
-  border: 1px solid #272A30 !important;
-  border-radius: 20px !important;
-  padding: 2.5rem 2rem !important;
-  color: #FAF9F6 !important;
-  box-shadow: 0 10px 40px rgba(0,0,0,0.35) !important;
-}
-[data-testid="stVerticalBlockBorderWrapper"]:has(.login-marker) * {
-  color: #FAF9F6 !important;
-}
-[data-testid="stVerticalBlockBorderWrapper"]:has(.login-marker) h1,
-[data-testid="stVerticalBlockBorderWrapper"]:has(.login-marker) h2,
-[data-testid="stVerticalBlockBorderWrapper"]:has(.login-marker) h3,
-[data-testid="stVerticalBlockBorderWrapper"]:has(.login-marker) h4,
-[data-testid="stVerticalBlockBorderWrapper"]:has(.login-marker) p,
-[data-testid="stVerticalBlockWrapper"]:has(.login-marker) label {
-  color: #FAF9F6 !important;
-}
-[data-testid="stVerticalBlockBorderWrapper"]:has(.login-marker) .stTextInput > div > div > input {
-  background: #1E2025 !important;
-  border: 1px solid rgba(255,255,255,0.12) !important;
-  color: #FAF9F6 !important;
-  border-radius: 12px !important;
-}
-[data-testid="stVerticalBlockBorderWrapper"]:has(.login-marker) .stTextInput > div > div > input:focus {
-  border-color: #D4AF37 !important;
-  box-shadow: 0 0 0 3px rgba(212, 175, 55, 0.15) !important;
-}
-[data-testid="stVerticalBlockBorderWrapper"]:has(.login-marker) .stFormSubmitButton > button {
-  background: #D4AF37 !important;
-  border-color: #D4AF37 !important;
-  color: #141518 !important;
-  border-radius: 12px !important;
-  font-weight: 700 !important;
-  padding: 0.875rem 2rem !important;
-  font-size: 1rem !important;
-  letter-spacing: 0.02em !important;
-}
-[data-testid="stVerticalBlockBorderWrapper"]:has(.login-marker) .stFormSubmitButton > button:hover {
-  background: #C9A227 !important;
   border-color: #C9A227 !important;
-}
-
-/* ============================================================
-   KPI METRIC CARDS — Dark Charcoal with Gold/Ivory
-============================================================ */
-.kpi-card {
-  background: var(--panel-obsidian) !important;
-  border: 1px solid var(--panel-border) !important;
-  border-radius: var(--radius-lg) !important;
-  padding: 1.35rem 1.5rem !important;
-  text-align: center !important;
-  color: var(--white) !important;
-  box-shadow: var(--shadow-inner), var(--shadow-lg) !important;
-  transition: all var(--duration-normal) var(--ease-smooth) !important;
-}
-.kpi-card:hover { 
-  border-color: var(--ochre-border) !important; 
-  transform: translateY(-2px) !important; 
-  box-shadow: var(--shadow-inner), 0 16px 48px -16px rgba(212, 175, 55, 0.15) !important;
-}
-.kpi-card .value { 
-  font-family: 'JetBrains Mono', monospace !important;
-  font-variant-numeric: tabular-nums !important;
-  font-size: clamp(1.75rem, 3vw, 2.1rem) !important; 
-  font-weight: 700 !important; 
-  color: var(--ochre-gold) !important; 
-  display: block !important; 
-  margin-bottom: 0.25rem !important; 
-  line-height: 1.1 !important; 
-  letter-spacing: -0.02em !important;
-}
-.kpi-card .label { 
-  font-family: 'Plus Jakarta Sans', sans-serif !important;
-  font-size: 0.68rem !important; 
-  text-transform: uppercase !important; 
-  letter-spacing: 0.1em !important; 
-  color: var(--silver) !important; 
-  display: block !important; 
-  font-weight: 600 !important; 
-}
-.kpi-card .sub { 
-  font-family: 'Plus Jakarta Sans', sans-serif !important;
-  font-size: 0.72rem !important; 
-  color: var(--ochre-gold) !important; 
-  font-weight: 600 !important; 
-  display: block !important; 
-  margin-top: 0.5rem !important; 
-}
-
-/* ============================================================
-   PIPELINE STEPPER — Refined Horizontal Progress Track
-============================================================ */
-.pipeline-stepper {
-  display: flex !important;
-  gap: 0 !important;
-  padding: 1.25rem 1.5rem !important;
-  background: var(--panel-obsidian) !important;
-  border: 1px solid var(--panel-border) !important;
-  border-radius: var(--radius-lg) !important;
-  overflow-x: auto !important;
-  position: relative !important;
-}
-.pipeline-stepper::before {
-  content: '' !important;
-  position: absolute !important;
-  top: 50% !important;
-  left: 3.5rem !important;
-  right: 3.5rem !important;
-  height: 2px !important;
-  background: linear-gradient(90deg, var(--panel-border) 0%, var(--ochre-border) 50%, var(--panel-border) 100%) !important;
-  transform: translateY(-50%) !important;
-  z-index: 0 !important;
-}
-.pipeline-step {
-  flex: 1 !important;
-  min-width: 110px !important;
-  text-align: center !important;
-  padding: 0.75rem 0.5rem !important;
-  position: relative !important;
-  z-index: 1 !important;
-}
-.pipeline-dot {
-  width: 14px !important; 
-  height: 14px !important; 
-  border-radius: 50% !important;
-  margin: 0 auto 0.5rem !important; 
-  border: 2px solid rgba(255,255,255,0.12) !important;
-  background: var(--panel-obsidian) !important; 
-  transition: all var(--duration-normal) var(--ease-smooth) !important;
-  position: relative !important;
-  box-shadow: 0 0 0 4px var(--panel-obsidian) !important;
-}
-.pipeline-step.armed .pipeline-dot { 
-  background: var(--emerald) !important; 
-  border-color: var(--emerald) !important; 
-  box-shadow: 0 0 0 4px var(--panel-obsidian), 0 0 12px var(--emerald-glow) !important; 
-}
-.pipeline-step.queued .pipeline-dot { 
-  background: var(--ochre-gold) !important; 
-  border-color: var(--ochre-gold) !important; 
-  box-shadow: 0 0 0 4px var(--panel-obsidian), 0 0 12px var(--ochre-wash) !important; 
-}
-.pipeline-step.standby .pipeline-dot { 
-  background: var(--panel-obsidian) !important; 
-  border-color: rgba(255,255,255,0.12) !important; 
-}
-.pipeline-label { 
-  font-family: 'Plus Jakarta Sans', sans-serif !important;
-  font-size: 0.68rem !important; 
-  text-transform: uppercase !important; 
-  letter-spacing: 0.08em !important; 
-  color: var(--silver-dim) !important; 
-  font-weight: 600 !important; 
-  white-space: nowrap !important;
-}
-.pipeline-step.armed .pipeline-label { color: var(--emerald) !important; font-weight: 700 !important; }
-.pipeline-step.queued .pipeline-label { color: var(--ochre-gold) !important; font-weight: 700 !important; }
-.pipeline-step.standby .pipeline-label { color: var(--silver-dim) !important; }
-
-/* ============================================================
-   STATUS BADGES — Refined Editorial Style
-============================================================ */
-.tag {
-  display: inline-flex !important;
-  align-items: center !important;
-  padding: 0.175rem 0.625rem !important;
-  border-radius: var(--radius-pill) !important;
-  font-family: 'Plus Jakarta Sans', sans-serif !important;
-  font-size: 0.65rem !important;
-  font-weight: 600 !important;
-  text-transform: uppercase !important;
-  letter-spacing: 0.06em !important;
-  margin-right: 0.35rem !important;
-  margin-bottom: 0.25rem !important;
-}
-.tag-armed { background: rgba(16, 185, 129, 0.18) !important; color: #34D399 !important; border: 1px solid rgba(52, 211, 153, 0.4) !important; }
-.tag-standby { background: rgba(255, 255, 255, 0.08) !important; color: #E2E8F0 !important; border: 1px solid rgba(255, 255, 255, 0.18) !important; }
-.tag-draft { background: rgba(212, 175, 55, 0.12) !important; color: #B88A1A !important; border: 1px solid rgba(212, 175, 55, 0.25) !important; }
-.tag-needs_review { background: rgba(212, 175, 55, 0.12) !important; color: #C9A227 !important; border: 1px solid rgba(212, 175, 55, 0.25) !important; }
-.tag-approved { background: rgba(16, 185, 129, 0.12) !important; color: #059669 !important; border: 1px solid rgba(16, 185, 129, 0.25) !important; }
-.tag-rejected { background: rgba(239, 68, 68, 0.1) !important; color: #DC2626 !important; border: 1px solid rgba(239, 68, 68, 0.2) !important; }
-.tag-failed { background: rgba(148, 163, 184, 0.1) !important; color: #64748B !important; border: 1px solid rgba(148, 163, 184, 0.2) !important; }
-.tag-queued { background: rgba(212, 175, 55, 0.12) !important; color: #C9A227 !important; border: 1px solid rgba(212, 175, 55, 0.25) !important; }
-.tag-done { background: rgba(16, 185, 129, 0.12) !important; color: #059669 !important; border: 1px solid rgba(16, 185, 129, 0.25) !important; }
-
-/* ============================================================
-   BUTTONS — Tactile Micro-Interactions
-============================================================ */
-.stButton > button, .stFormSubmitButton > button {
-  border-radius: var(--radius-md) !important;
-  font-family: 'Plus Jakarta Sans', sans-serif !important;
-  font-weight: 600 !important;
-  font-size: 0.875rem !important;
-  letter-spacing: 0.01em !important;
-  transition: all var(--duration-normal) var(--ease-smooth) !important;
-  border: 1px solid var(--card-border) !important;
-  background: #FFFFFF !important;
-  color: var(--ink) !important;
-  padding: 0.625rem 1.375rem !important;
-}
-.stButton > button:hover, .stFormSubmitButton > button:hover {
-  border-color: var(--ochre-gold) !important;
-  color: var(--ink) !important;
+  color: #1A1A2E !important;
   background: #FEFEF8 !important;
   transform: translateY(-1px) !important;
-  box-shadow: var(--shadow-sm) !important;
+  box-shadow: 0 2px 8px rgba(212, 175, 55, 0.1) !important;
 }
 .stButton > button:active, .stFormSubmitButton > button:active {
   transform: translateY(0) !important;
 }
 .stButton > button[kind="primary"], .stFormSubmitButton > button[kind="primary"] {
-  background: var(--panel-obsidian) !important;
-  border-color: var(--ochre-border) !important;
-  color: var(--white) !important;
-  box-shadow: 0 0 0 1px var(--ochre-border) inset !important;
+  background: linear-gradient(135deg, #2A2518 0%, #161512 100%) !important;
+  border-color: #D4AF37 !important;
+  color: #D4AF37 !important;
+  box-shadow: 0 0 0 1px #D4AF37 inset !important;
 }
 .stButton > button[kind="primary"]:hover, .stFormSubmitButton > button[kind="primary"]:hover {
-  background: var(--panel-obsidian-elevated) !important;
-  border-color: var(--ochre-gold) !important;
-  color: var(--white) !important;
+  background: linear-gradient(135deg, #1E2028 0%, #1A1B20 100%) !important;
+  border-color: #D4AF37 !important;
+  color: #D4AF37 !important;
   box-shadow: 0 4px 20px rgba(212, 175, 55, 0.25) !important;
 }
 .stButton > button[kind="secondary"] {
-  background: var(--card-porcelain) !important;
-  border-color: var(--card-border) !important;
-  color: var(--ink) !important;
+  background: #FCFBF9 !important;
+  border-color: #E6E0D4 !important;
+  color: #1A1A2E !important;
 }
 .stButton > button[kind="secondary"]:hover {
   background: #F3EFE6 !important;
-  border-color: var(--ochre-border) !important;
-  color: var(--ink) !important;
+  border-color: #D4AF37 !important;
+  color: #1A1A2E !important;
 }
 
 /* ============================================================
@@ -1434,26 +2047,26 @@ div[data-testid="stContainer"]:has(.light-panel-marker) .stTextArea > div > div 
 .stSelectbox > div > div,
 .stNumberInput > div > div > input {
   background: #FFFFFF !important;
-  border: 1px solid var(--card-border) !important;
-  border-radius: var(--radius-md) !important;
-  color: var(--ink) !important;
+  border: 1px solid #E6E0D4 !important;
+  border-radius: 10px !important;
+  color: #1A1A2E !important;
   font-family: 'Plus Jakarta Sans', sans-serif !important;
   font-size: 0.9rem !important;
   padding: 0.625rem 0.875rem !important;
-  transition: all var(--duration-fast) var(--ease-smooth) !important;
+  transition: all 120ms cubic-bezier(0.22, 1, 0.36, 1) !important;
 }
 .stTextInput > div > div > input:focus,
 .stTextArea > div > div > textarea:focus,
 .stSelectbox > div > div:focus-within,
 .stNumberInput > div > div > input:focus {
-  border-color: var(--ochre-gold) !important;
-  box-shadow: var(--shadow-gold) !important;
+  border-color: #C9A227 !important;
+  box-shadow: 0 0 0 3px rgba(212, 175, 55, 0.15) !important;
   outline: none !important;
 }
 .stSelectbox > div > div {
   background: #FFFFFF !important;
-  border: 1px solid var(--card-border) !important;
-  border-radius: var(--radius-md) !important;
+  border: 1px solid #E6E0D4 !important;
+  border-radius: 10px !important;
 }
 .stTextArea > div > div > textarea {
   min-height: 100px !important;
@@ -1462,19 +2075,38 @@ div[data-testid="stContainer"]:has(.light-panel-marker) .stTextArea > div > div 
   font-family: 'Plus Jakarta Sans', sans-serif !important;
 }
 .stToggle > label { 
-  color: var(--ink) !important; 
+  color: #1A1A2E !important; 
   font-family: 'Plus Jakarta Sans', sans-serif !important;
   font-weight: 500 !important;
+}
+
+/* Dark Card Inputs — Seamless blending into #1E2028 background */
+[data-testid="stVerticalBlockBorderWrapper"]:has(.agent-card-marker) .stNumberInput > div > div > input,
+[data-testid="stVerticalBlockBorderWrapper"]:has(.agent-card-marker) .stTextInput > div > div > input,
+[data-testid="stVerticalBlockBorderWrapper"]:has(.agent-card-marker) .stSelectbox > div > div,
+[data-testid="stVerticalBlockBorderWrapper"]:has(.agent-card-marker) .stTextArea > div > div > textarea,
+[data-testid="stVerticalBlockBorderWrapper"]:has(.login-marker) .stTextInput > div > div > input {
+  background: #252832 !important;
+  border: 1px solid rgba(255,255,255,0.16) !important;
+  color: #FFFFFF !important;
+  border-radius: 10px !important;
+}
+[data-testid="stVerticalBlockBorderWrapper"]:has(.agent-card-marker) .stNumberInput > div > div > input:focus,
+[data-testid="stVerticalBlockBorderWrapper"]:has(.agent-card-marker) .stTextInput > div > div > input:focus,
+[data-testid="stVerticalBlockBorderWrapper"]:has(.agent-card-marker) .stSelectbox > div > div:focus-within,
+[data-testid="stVerticalBlockBorderWrapper"]:has(.login-marker) .stTextInput > div > div > input:focus {
+  border-color: #C9A227 !important;
+  box-shadow: 0 0 0 3px rgba(212, 175, 55, 0.15) !important;
 }
 
 /* ============================================================
    DATAFRAMES — Clean Tables
 ============================================================ */
 [data-testid="stDataFrame"] {
-  border: 1px solid var(--card-border) !important;
-  border-radius: var(--radius-lg) !important;
+  border: 1px solid #E6E0D4 !important;
+  border-radius: 16px !important;
   overflow: hidden !important;
-  background: var(--card-porcelain) !important;
+  background: #FCFBF9 !important;
 }
 
 /* ============================================================
@@ -1489,9 +2121,9 @@ div[data-testid="stContainer"]:has(.light-panel-marker) .stTextArea > div > div 
   color: #C0C0C8 !important; 
   line-height: 1.5 !important;
 }
-.log-line.ok { color: var(--emerald) !important; }
+.log-line.ok { color: #10B981 !important; }
 .log-line.err { color: #EF4444 !important; }
-.log-line.inf { color: var(--ochre-gold) !important; }
+.log-line.inf { color: #C9A227 !important; }
 
 /* ============================================================
    HIDE STREAMLIT CHROME
@@ -1784,6 +2416,151 @@ render_top_nav()
 # ===========================================================================
 # PAGE 1 — COMMAND CENTER
 # ===========================================================================
+@st_fragment
+def render_agent_fleet_section():
+    """Live Agent Fleet — renders independently for instant updates."""
+    st.markdown('<div class="agent-card-marker"></div>', unsafe_allow_html=True)
+    
+    st.markdown("### Live Agent Fleet")
+    st.caption("Toggle caps and enablement. Changes apply to the next cron tick.")
+    
+    agents = fetch_agents()
+    if not agents:
+        st.caption("No agents registered.")
+    else:
+        cols = st.columns(2)
+        for idx, agent in enumerate(agents):
+            name = agent.get("name", "?")
+            enabled = bool(agent.get("enabled"))
+            cap = int(agent.get("daily_cap") or 1)
+            used = int(agent.get("runs_today") or 0)
+            schedule = agent.get("schedule") or "unspecified"
+            purpose = agent.get("purpose") or ""
+            progress = int((used / cap) * 100) if cap else 0
+
+            with cols[idx % 2]:
+                with st.container(border=True):
+                    st.markdown('<div class="agent-card-marker"></div>', unsafe_allow_html=True)
+                    
+                    c_info, c_ctrl = st.columns([1.8, 1.2])
+                    with c_info:
+                        st.markdown(f"**{name}**")
+                        st.markdown(tag_html("armed" if enabled else "standby"), unsafe_allow_html=True)
+                        st.caption(purpose)
+                        st.caption(f"⏱️ Cron: {schedule}  |  📊 Runs Today: {used} / {cap}")
+                        st.progress(progress / 100)
+                    
+                    with c_ctrl:
+                        new_enabled = st.toggle("Armed", value=enabled, key=f"cmd_en_{name}")
+                        new_cap = st.number_input("Daily Cap", min_value=0, max_value=50, value=cap, key=f"cmd_cap_{name}", label_visibility="visible")
+                        if st.button("💾 Save", key=f"cmd_save_{name}", use_container_width=True, type="primary"):
+                            safe_upsert("agents", {"name": name, "enabled": new_enabled, "daily_cap": int(new_cap)}, "name")
+                            st.toast(f"✅ {name} updated")
+                            safe_rerun()
+                        if st.button("⚡ Run", key=f"cmd_run_{name}", use_container_width=True, type="secondary"):
+                            safe_insert("tasks", {"agent": name, "payload": {"quick_run": True}, "status": "queued", "created_at": datetime.utcnow().isoformat()})
+                            st.toast(f"⚡ {name} queued")
+                            safe_rerun()
+
+
+@st_fragment
+def render_task_dispatch_section():
+    """Task Dispatch Studio & Active Queue — independent fragments."""
+    with st.container(border=True):
+        # Task Dispatch Studio marker for CSS light card styling
+        st.markdown('<div class="light-panel-marker"></div>', unsafe_allow_html=True)
+        st.markdown("### Task Dispatch Studio")
+        st.caption("Queue a natural-language instruction for any agent. Brand links the task to a voice profile.")
+
+        brands = fetch_brands()
+        brand_keys = [b.get("key") for b in fetch_brands() if b.get("key")]
+        agent_names = [a.get("name") for a in fetch_agents() if a.get("name")]
+
+        with st.form("cmd_task_form"):
+            c_brand, c_agent = st.columns(2)
+            with c_brand:
+                target_brand = st.selectbox("Brand", brand_keys or ["edivic"], key="cmd_brand")
+            with c_agent:
+                target_agent = st.selectbox("Agent", agent_names or ["research_agent"], key="cmd_agent")
+            instructions = st.text_area(
+                "Instructions / Topic",
+                height=120,
+                key="cmd_instructions",
+                placeholder="e.g. Research zero-budget growth tactics for early-stage SaaS",
+            )
+            b1, b2 = st.columns(2)
+            with b1:
+                queued = st.form_submit_button("⚡ Queue Task", use_container_width=True, type="primary")
+            with b2:
+                run_now = st.form_submit_button("🚀 Queue & Run Now", use_container_width=True, type="secondary")
+
+        if queued or run_now:
+            payload = {}
+            if instructions.strip():
+                payload["text"] = instructions.strip()
+            if target_brand and target_brand != "(none)":
+                payload["brand"] = target_brand
+            if not payload:
+                st.warning("Provide at least the instructions.")
+            else:
+                saved = safe_insert("tasks", {"agent": target_agent, "payload": payload, "status": "queued", "created_at": datetime.utcnow().isoformat()})
+                if saved:
+                    st.toast(f"Task queued for {target_agent}.")
+                    if run_now:
+                        with st.status("Executing agent pipeline…", expanded=True) as status:
+                            try:
+                                proc = subprocess.run(
+                                    [sys.executable, "-m", "scripts.run_queued_tasks"],
+                                    cwd=str(ROOT_DIR),
+                                    capture_output=True,
+                                    text=True,
+                                    timeout=180,
+                                )
+                                if proc.stdout:
+                                    for line in proc.stdout.splitlines():
+                                        st.markdown(f'<div class="log-line {"ok" if "ok" in line.lower() else "inf"}">{line}</div>', unsafe_allow_html=True)
+                                if proc.stderr:
+                                    for line in proc.stderr.splitlines():
+                                        st.markdown(f'<div class="log-line err">{line}</div>', unsafe_allow_html=True)
+                                status.update(label="Done.", state="complete")
+                            except subprocess.TimeoutExpired:
+                                status.update(label="Timed out (180s).", state="error")
+                            except Exception as exc:
+                                status.update(label=f"Error: {exc}", state="error")
+                            safe_rerun()
+
+    st.divider()
+
+    # ---- Active Task Queue ----
+    with st.container(border=True):
+        # Task Queue marker for CSS light card styling
+        st.markdown('<div class="light-panel-marker"></div>', unsafe_allow_html=True)
+        st.markdown("### Active Task Queue")
+        tasks_q = safe_select("tasks", eq={"status": "queued"}, order="created_at", limit=20)
+        if not tasks_q:
+            st.caption("Queue is empty.")
+        else:
+            for task in tasks_q:
+                t_id = task.get("id", "?")[:8]
+                t_agent = task.get("agent", "?")
+                t_status = task.get("status", "?")
+                t_payload = task.get("payload", {})
+                t_topic = (t_payload.get("text") or t_payload.get("topic") or "")[:80]
+                t_brand = t_payload.get("brand", "—")
+                with st.container(border=True):
+                    c1, c2, c3 = st.columns([2, 1, 2])
+                    with c1:
+                        st.markdown(f"**{t_agent}** `{t_id}`")
+                        st.caption(f"Brand: {t_brand} · {t_topic}")
+                    with c2:
+                        st.markdown(tag_html(t_status), unsafe_allow_html=True)
+                    with c3:
+                        if st.button("🗑️ Remove", key=f"task_del_{task.get('id', '?')}", use_container_width=True):
+                            safe_delete("tasks", "id", task.get("id", ""))
+                            st.toast("Task removed.")
+                            safe_rerun()
+
+
 def render_command_center() -> None:
     st.markdown('<div class="page-fade">', unsafe_allow_html=True)
     st.title("Command Center")
@@ -1847,7 +2624,7 @@ def render_command_center() -> None:
     ]
     agent_map = {a["name"]: a for a in fetch_agents()}
     
-    # Build entire pipeline stepper as single HTML string (FIX 3)
+    # Build entire pipeline stepper as single HTML string
     stepper_html = ['<div class="pipeline-stepper">']
     for label, name in pipeline_agents:
         agent = agent_map.get(name)
@@ -1868,7 +2645,6 @@ def render_command_center() -> None:
             pipe_topic = st.text_area("Topic / Instructions", height=100, key="pipe_topic", placeholder="e.g. Zero-budget growth tactics for early-stage AI startups")
             if st.form_submit_button("🔗 Queue Full Pipeline", type="primary", use_container_width=True):
                 if pipe_topic.strip():
-                    # Queue research_agent first with pipeline flag
                     safe_insert("tasks", {"agent": "research_agent", "payload": {"text": pipe_topic.strip(), "brand": pipe_brand, "pipeline": True}, "status": "queued", "created_at": datetime.utcnow().isoformat()})
                     st.toast("Full pipeline queued!")
                     safe_rerun()
@@ -1881,145 +2657,10 @@ def render_command_center() -> None:
     left, right = st.columns([1.5, 1], gap="large")
 
     with left:
-        with st.container(border=True):
-            # Agent Fleet marker for CSS dark card styling
-            st.markdown('<div class="agent-card-marker"></div>', unsafe_allow_html=True)
-            
-            st.markdown("### Live Agent Fleet")
-            st.caption("Toggle caps and enablement. Changes apply to the next cron tick.")
-            
-            agents = fetch_agents()
-            if not agents:
-                st.caption("No agents registered.")
-            else:
-                cols = st.columns(2)
-                for idx, agent in enumerate(agents):
-                    name = agent.get("name", "?")
-                    enabled = bool(agent.get("enabled"))
-                    cap = int(agent.get("daily_cap") or 1)
-                    used = int(agent.get("runs_today") or 0)
-                    schedule = agent.get("schedule") or "unspecified"
-                    purpose = agent.get("purpose") or ""
-                    progress = int((used / cap) * 100) if cap else 0
-
-                    with cols[idx % 2]:
-                        with st.container(border=True):
-                            st.markdown('<div class="agent-card-marker"></div>', unsafe_allow_html=True)
-                            
-                            c_info, c_ctrl = st.columns([1.8, 1.2])
-                            with c_info:
-                                st.markdown(f"**{name}**")
-                                st.markdown(tag_html("armed" if enabled else "standby"), unsafe_allow_html=True)
-                                st.caption(purpose)
-                                st.caption(f"⏱️ Cron: {schedule}  |  📊 Runs Today: {used} / {cap}")
-                                st.progress(progress / 100)
-                            
-                            with c_ctrl:
-                                new_enabled = st.toggle("Armed", value=enabled, key=f"cmd_en_{name}")
-                                new_cap = st.number_input("Daily Cap", min_value=0, max_value=50, value=cap, key=f"cmd_cap_{name}", label_visibility="visible")
-                                if st.button("💾 Save", key=f"cmd_save_{name}", use_container_width=True, type="primary"):
-                                    safe_upsert("agents", {"name": name, "enabled": new_enabled, "daily_cap": int(new_cap)}, "name")
-                                    st.toast(f"✅ {name} updated")
-                                    safe_rerun()
-                                if st.button("⚡ Run", key=f"cmd_run_{name}", use_container_width=True, type="secondary"):
-                                    safe_insert("tasks", {"agent": name, "payload": {"quick_run": True}, "status": "queued", "created_at": datetime.utcnow().isoformat()})
-                                    st.toast(f"⚡ {name} queued")
-                                    safe_rerun()
+        render_agent_fleet_section()
 
     with right:
-        with st.container(border=True):
-            # Task Dispatch Studio marker for CSS light card styling
-            st.markdown('<div class="light-panel-marker"></div>', unsafe_allow_html=True)
-            st.markdown("### Task Dispatch Studio")
-            st.caption("Queue a natural-language instruction for any agent. Brand links the task to a voice profile.")
-
-            brands = fetch_brands()
-            brand_keys = [b.get("key") for b in fetch_brands() if b.get("key")]
-            agent_names = [a.get("name") for a in fetch_agents() if a.get("name")]
-
-            with st.form("cmd_task_form"):
-                c_brand, c_agent = st.columns(2)
-                with c_brand:
-                    target_brand = st.selectbox("Brand", brand_keys or ["edivic"], key="cmd_brand")
-                with c_agent:
-                    target_agent = st.selectbox("Agent", agent_names or ["research_agent"], key="cmd_agent")
-                instructions = st.text_area(
-                    "Instructions / Topic",
-                    height=120,
-                    key="cmd_instructions",
-                    placeholder="e.g. Research zero-budget growth tactics for early-stage SaaS",
-                )
-                b1, b2 = st.columns(2)
-                with b1:
-                    queued = st.form_submit_button("⚡ Queue Task", use_container_width=True, type="primary")
-                with b2:
-                    run_now = st.form_submit_button("🚀 Queue & Run Now", use_container_width=True, type="secondary")
-
-            if queued or run_now:
-                payload = {}
-                if instructions.strip():
-                    payload["text"] = instructions.strip()
-                if target_brand and target_brand != "(none)":
-                    payload["brand"] = target_brand
-                if not payload:
-                    st.warning("Provide at least the instructions.")
-                else:
-                    saved = safe_insert("tasks", {"agent": target_agent, "payload": payload, "status": "queued", "created_at": datetime.utcnow().isoformat()})
-                    if saved:
-                        st.toast(f"Task queued for {target_agent}.")
-                        if run_now:
-                            with st.status("Executing agent pipeline…", expanded=True) as status:
-                                try:
-                                    proc = subprocess.run(
-                                        [sys.executable, "-m", "scripts.run_queued_tasks"],
-                                        cwd=str(ROOT_DIR),
-                                        capture_output=True,
-                                        text=True,
-                                        timeout=180,
-                                    )
-                                    if proc.stdout:
-                                        for line in proc.stdout.splitlines():
-                                            st.markdown(f'<div class="log-line {"ok" if "ok" in line.lower() else "inf"}">{line}</div>', unsafe_allow_html=True)
-                                    if proc.stderr:
-                                        for line in proc.stderr.splitlines():
-                                            st.markdown(f'<div class="log-line err">{line}</div>', unsafe_allow_html=True)
-                                    status.update(label="Done.", state="complete")
-                                except subprocess.TimeoutExpired:
-                                    status.update(label="Timed out (180s).", state="error")
-                                except Exception as exc:
-                                    status.update(label=f"Error: {exc}", state="error")
-                                safe_rerun()
-
-        st.divider()
-
-        # ---- Active Task Queue ----
-        with st.container(border=True):
-            # Task Queue marker for CSS light card styling
-            st.markdown('<div class="light-panel-marker"></div>', unsafe_allow_html=True)
-            st.markdown("### Active Task Queue")
-            tasks_q = safe_select("tasks", eq={"status": "queued"}, order="created_at", limit=20)
-            if not tasks_q:
-                st.caption("Queue is empty.")
-            else:
-                for task in tasks_q:
-                    t_id = task.get("id", "?")[:8]
-                    t_agent = task.get("agent", "?")
-                    t_status = task.get("status", "?")
-                    t_payload = task.get("payload", {})
-                    t_topic = (t_payload.get("text") or t_payload.get("topic") or "")[:80]
-                    t_brand = t_payload.get("brand", "—")
-                    with st.container(border=True):
-                        c1, c2, c3 = st.columns([2, 1, 2])
-                        with c1:
-                            st.markdown(f"**{t_agent}** `{t_id}`")
-                            st.caption(f"Brand: {t_brand} · {t_topic}")
-                        with c2:
-                            st.markdown(tag_html(t_status), unsafe_allow_html=True)
-                        with c3:
-                            if st.button("🗑️ Remove", key=f"task_del_{task.get('id', '?')}", use_container_width=True):
-                                safe_delete("tasks", "id", task.get("id", ""))
-                                st.toast("Task removed.")
-                                safe_rerun()
+        render_task_dispatch_section()
 
     st.markdown('</div>', unsafe_allow_html=True)
 
@@ -2094,7 +2735,7 @@ def render_review_inbox() -> None:
                 ts = (row.get("created_at") or "")[:16]
                 title = (row.get("clean") or row.get("raw") or "")[:80]
                 
-                card_style = "background:#18181B;border-color:#D4AF37;" if selected else ""
+                card_style = "background:#141518;border-color:#D4AF37;" if selected else ""
                 with st.container(border=True):
                     st.markdown(
                         f'<div style="{card_style}">'
